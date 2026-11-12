@@ -9,12 +9,8 @@ import {
   EncryptedVaultPayload,
 } from '@/lib/crypto/vaultCrypto';
 import {
-  Zap,
   AlertTriangle,
-  ArrowRight,
   Upload,
-  Sparkles,
-  RefreshCw,
   KeyRound,
   Users,
 } from 'lucide-react';
@@ -25,8 +21,7 @@ export default function RecoverPage() {
   const [recoveryMode, setRecoveryMode] = useState<'passphrase' | 'shamir'>('passphrase');
   const [vaultPayload, setVaultPayload] = useState<EncryptedVaultPayload | null>(null);
   const [passphrase, setPassphrase] = useState('');
-  
-  // 3 Shamir share inputs for break-glass recovery
+
   const [share1, setShare1] = useState('');
   const [share2, setShare2] = useState('');
   const [share3, setShare3] = useState('');
@@ -36,7 +31,6 @@ export default function RecoverPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  // Load latest vault from localStorage if present
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const latestUser = localStorage.getItem('omni_latest_user') || 'damisileayoola@gmail.com';
@@ -46,7 +40,6 @@ export default function RecoverPage() {
         try {
           const parsed = JSON.parse(cached);
           setVaultPayload(parsed);
-          // If vault has pre-loaded shares, pre-populate for demo convenience if user wants
           if (parsed.shamirShares && parsed.shamirShares.length >= 3) {
             setShare1(parsed.shamirShares[0].shareHex);
             setShare2(parsed.shamirShares[1].shareHex);
@@ -82,7 +75,7 @@ export default function RecoverPage() {
     }
 
     setErrorMessage(
-      'No local vault found for this handle. Please upload your Rescue Kit JSON or enroll first.'
+      'No local vault found for this identifier. Upload your Rescue Kit JSON file below.'
     );
   };
 
@@ -113,10 +106,10 @@ export default function RecoverPage() {
     if (!vaultPayload || !passphrase.trim()) return;
     setIsProcessing(true);
     setErrorMessage(null);
-    setStatusMessage('Deriving key via Argon2id (64MB memory, 3 iterations)...');
+    setStatusMessage('Computing Argon2id (64MB memory, 3 iterations)...');
 
     try {
-      await new Promise((r) => setTimeout(r, 100)); // Yield to update UI
+      await new Promise((r) => setTimeout(r, 80));
       const accounts = await unlockVaultWithPassphrase(passphrase, vaultPayload);
       setUnlockedAccounts(accounts);
       setStage('unlocked');
@@ -134,16 +127,16 @@ export default function RecoverPage() {
     if (!vaultPayload) return;
     const shares = [share1.trim(), share2.trim(), share3.trim()].filter(Boolean);
     if (shares.length < 3) {
-      setErrorMessage('You must provide at least 3 valid Shamir shares.');
+      setErrorMessage('Provide at least 3 valid Shamir shares.');
       return;
     }
 
     setIsProcessing(true);
     setErrorMessage(null);
-    setStatusMessage('Reconstructing 256-bit Master Key via Shamir polynomial interpolation...');
+    setStatusMessage('Reconstructing master key from 3 shares...');
 
     try {
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 80));
       const accounts = await unlockVaultWithShares(shares, vaultPayload);
       setUnlockedAccounts(accounts);
       setStage('unlocked');
@@ -164,79 +157,74 @@ export default function RecoverPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 py-12 px-4 sm:px-6">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 py-10 px-4 sm:px-6">
       <div className="max-w-xl mx-auto">
         {/* Header */}
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-400 mb-2">
-            <Zap className="h-3.5 w-3.5 fill-current" />
-            <span>Hardware-Free Recovery Engine</span>
-          </div>
-          <h1 className="text-3xl font-extrabold text-white">Emergency Disaster Recovery</h1>
-          <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
-            Use any borrowed computer or incognito tab to unlock your 2FA codes when your phone is dead.
+        <div className="mb-8 border-b border-zinc-800 pb-5">
+          <h1 className="text-xl font-bold text-white">Open emergency vault</h1>
+          <p className="text-xs text-zinc-400 mt-1">
+            Decrypt your two-factor codes using your passphrase or three Shamir shares.
           </p>
         </div>
 
         {/* Error Notification */}
         {errorMessage && (
-          <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-300 flex items-start gap-2.5">
+          <div className="mb-6 rounded-lg border border-red-900/60 bg-red-950/30 p-3 text-xs text-red-300 flex items-start gap-2.5">
             <AlertTriangle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-red-200">Authentication Error</p>
-              <p className="mt-0.5">{errorMessage}</p>
+              <p className="font-semibold text-red-200">Could not open vault</p>
+              <p className="mt-0.5 text-red-300/90">{errorMessage}</p>
             </div>
           </div>
         )}
 
         {/* STAGE 1: Identify / Locate Vault */}
         {stage === 'identify' && (
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 shadow-xl backdrop-blur-md">
-            <h3 className="text-base font-bold text-white mb-1">Step 1: Locate Emergency Vault</h3>
-            <p className="text-xs text-zinc-400 mb-5">
-              Enter your handle or upload your encrypted rescue kit JSON file.
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
+            <h3 className="text-sm font-semibold text-white mb-1">Locate your vault</h3>
+            <p className="text-xs text-zinc-400 mb-4">
+              Enter your handle or upload your encrypted rescue kit file.
             </p>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1">
-                  Your Handle / Email
+                <label className="block text-xs text-zinc-400 mb-1">
+                  Identifier
                 </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="user@gmail.com"
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-emerald-500 focus:outline-none"
+                    placeholder="name@example.com"
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2 text-sm text-white placeholder-zinc-500 focus:border-zinc-400 focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={handleLookup}
-                    className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-xs font-bold text-zinc-950 hover:bg-emerald-400 transition"
+                    className="rounded-lg bg-white px-4 py-2 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 transition shrink-0"
                   >
-                    <span>Proceed</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
+                    Find vault
                   </button>
                 </div>
               </div>
 
               <div className="relative flex py-2 items-center">
                 <div className="flex-grow border-t border-zinc-800" />
-                <span className="flex-shrink mx-4 text-[11px] text-zinc-500 uppercase tracking-wider">
-                  or upload rescue kit
+                <span className="flex-shrink mx-3 text-[11px] text-zinc-500 font-mono">
+                  OR
                 </span>
                 <div className="flex-grow border-t border-zinc-800" />
               </div>
 
               <div>
-                <label className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-800 bg-zinc-950/60 p-4 cursor-pointer hover:border-zinc-700 transition">
-                  <Upload className="h-6 w-6 text-zinc-400 mb-1" />
+                <label className="flex flex-col items-center justify-center rounded-lg border border-dashed border-zinc-800 bg-zinc-900/40 p-4 cursor-pointer hover:border-zinc-700 transition">
+                  <Upload className="h-5 w-5 text-zinc-400 mb-1" />
                   <span className="text-xs font-medium text-zinc-300">
-                    Upload Rescue Kit (.json)
+                    Upload Rescue Kit JSON
                   </span>
                   <span className="text-[10px] text-zinc-500 mt-0.5">
-                    For air-gapped computers or fresh incognito sessions
+                    For incognito tabs or borrowed laptops
                   </span>
                   <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
                 </label>
@@ -247,49 +235,49 @@ export default function RecoverPage() {
 
         {/* STAGE 2: Choose Recovery Mode */}
         {stage === 'auth' && (
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 shadow-xl backdrop-blur-md">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
             <div className="flex items-center justify-between mb-4 border-b border-zinc-800 pb-3">
               <div>
-                <h3 className="text-base font-bold text-white">Step 2: Authenticate & Unlock</h3>
+                <h3 className="text-sm font-semibold text-white">Unlock vault</h3>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  Vault located for <strong className="text-emerald-400">{username}</strong>
+                  Vault found for <span className="text-zinc-200 font-medium">{username}</span>
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setStage('identify')}
-                className="text-xs text-zinc-500 hover:text-zinc-300"
+                className="text-xs text-zinc-400 hover:text-white"
               >
-                Change Handle
+                Change handle
               </button>
             </div>
 
             {/* Mode Switch Tabs */}
-            <div className="grid grid-cols-2 gap-2 p-1 bg-zinc-950 rounded-xl border border-zinc-800 mb-6">
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-950 rounded-lg border border-zinc-800 mb-5">
               <button
                 type="button"
                 onClick={() => setRecoveryMode('passphrase')}
-                className={`flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition ${
+                className={`flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded transition ${
                   recoveryMode === 'passphrase'
-                    ? 'bg-zinc-800 text-white shadow-sm'
+                    ? 'bg-zinc-800 text-white'
                     : 'text-zinc-400 hover:text-white'
                 }`}
               >
-                <KeyRound className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Passphrase (Fast)</span>
+                <KeyRound className="h-3.5 w-3.5" />
+                <span>Passphrase</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setRecoveryMode('shamir')}
-                className={`flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition ${
+                className={`flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded transition ${
                   recoveryMode === 'shamir'
-                    ? 'bg-zinc-800 text-white shadow-sm'
+                    ? 'bg-zinc-800 text-white'
                     : 'text-zinc-400 hover:text-white'
                 }`}
               >
-                <Users className="h-3.5 w-3.5 text-teal-400" />
-                <span>Shamir 3-of-5 (Break-Glass)</span>
+                <Users className="h-3.5 w-3.5" />
+                <span>3 of 5 Shares</span>
               </button>
             </div>
 
@@ -297,18 +285,18 @@ export default function RecoverPage() {
             {recoveryMode === 'passphrase' && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1">
-                    Enter Your Master Passphrase
+                  <label className="block text-xs text-zinc-400 mb-1">
+                    Passphrase
                   </label>
                   <input
                     type="password"
                     value={passphrase}
                     onChange={(e) => setPassphrase(e.target.value)}
-                    placeholder="Enter your mental passphrase"
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:border-emerald-500 focus:outline-none"
+                    placeholder="Enter your passphrase"
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2 text-sm text-white placeholder-zinc-500 focus:border-zinc-400 focus:outline-none font-mono"
                   />
                   <p className="text-[11px] text-zinc-500 mt-1">
-                    Computed via Argon2id (64MB memory, 3 iterations) directly in your browser.
+                    Evaluated locally via Argon2id (64MB memory).
                   </p>
                 </div>
 
@@ -316,19 +304,9 @@ export default function RecoverPage() {
                   type="button"
                   disabled={!passphrase.trim() || isProcessing}
                   onClick={handleUnlockWithPassphrase}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3 text-xs font-bold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:from-emerald-400 hover:to-teal-400 disabled:opacity-40"
+                  className="w-full rounded-lg bg-white py-2 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 transition disabled:opacity-40"
                 >
-                  {isProcessing ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                      <span>{statusMessage || 'Decrypting Vault...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      <span>Unlock with Passphrase</span>
-                    </>
-                  )}
+                  {isProcessing ? (statusMessage || 'Decrypting...') : 'Unlock vault'}
                 </button>
               </div>
             )}
@@ -337,45 +315,36 @@ export default function RecoverPage() {
             {recoveryMode === 'shamir' && (
               <div className="space-y-3">
                 <p className="text-xs text-zinc-400 mb-2">
-                  Paste any **3 recovery shares** from your printed card, trusted contact, or offline backup:
+                  Paste three recovery shares from your card, contact, or backup:
                 </p>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-                    Share #1 (Hex)
-                  </label>
                   <input
                     type="text"
                     value={share1}
                     onChange={(e) => setShare1(e.target.value)}
-                    placeholder="e.g. 8f2a9c..."
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 font-mono text-xs text-emerald-300 placeholder-zinc-700"
+                    placeholder="Share 1 (hex)"
+                    className="w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-1.5 font-mono text-xs text-zinc-300 placeholder-zinc-600"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-                    Share #2 (Hex)
-                  </label>
                   <input
                     type="text"
                     value={share2}
                     onChange={(e) => setShare2(e.target.value)}
-                    placeholder="e.g. 4d7b1e..."
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 font-mono text-xs text-emerald-300 placeholder-zinc-700"
+                    placeholder="Share 2 (hex)"
+                    className="w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-1.5 font-mono text-xs text-zinc-300 placeholder-zinc-600"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-                    Share #3 (Hex)
-                  </label>
                   <input
                     type="text"
                     value={share3}
                     onChange={(e) => setShare3(e.target.value)}
-                    placeholder="e.g. 1a9f0c..."
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 font-mono text-xs text-emerald-300 placeholder-zinc-700"
+                    placeholder="Share 3 (hex)"
+                    className="w-full rounded border border-zinc-800 bg-zinc-950 px-3 py-1.5 font-mono text-xs text-zinc-300 placeholder-zinc-600"
                   />
                 </div>
 
@@ -384,19 +353,9 @@ export default function RecoverPage() {
                     type="button"
                     disabled={!share1 || !share2 || !share3 || isProcessing}
                     onClick={handleUnlockWithShamir}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 py-3 text-xs font-bold text-zinc-950 shadow-lg shadow-teal-500/20 transition hover:from-teal-400 hover:to-emerald-400 disabled:opacity-40"
+                    className="w-full rounded-lg bg-white py-2 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 transition disabled:opacity-40"
                   >
-                    {isProcessing ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                        <span>{statusMessage || 'Interpolating Polynomial...'}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Users className="h-4 w-4" />
-                        <span>Reconstruct Master Key (3-of-5)</span>
-                      </>
-                    )}
+                    {isProcessing ? (statusMessage || 'Reconstructing...') : 'Reconstruct and unlock'}
                   </button>
                 </div>
               </div>

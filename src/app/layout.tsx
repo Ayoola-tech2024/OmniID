@@ -15,9 +15,9 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: 'OmniID — Hardware-Independent Biometric Emergency Vault',
+  title: 'OmniID — Hardware-Free Emergency Account Recovery',
   description:
-    'Universal zero-knowledge biometric disaster recovery lifeline. Recover 2FA TOTP codes when your phone is dead, lost, or stolen, with Twin-Shield protection.',
+    'Emergency 2FA account recovery when your phone is dead, lost, or out of power. Protected by Argon2id and 3-of-5 Shamir Secret Sharing.',
 };
 
 export default function RootLayout({
@@ -28,7 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-zinc-950 text-zinc-100 min-h-screen flex flex-col`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-zinc-950 text-zinc-100 min-h-screen flex flex-col font-sans`}
       >
         <Navbar />
         <main className="flex-1">{children}</main>
