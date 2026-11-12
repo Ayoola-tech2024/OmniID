@@ -2,24 +2,55 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import CameraFeed from '@/components/CameraFeed';
-import PinPad from '@/components/PinPad';
-import { createVault, VaultAccount, EncryptedVaultPayload } from '@/lib/crypto/fuzzyVault';
-import { Shield, Check, Plus, Trash2, KeyRound, Download, ArrowRight, Sparkles } from 'lucide-react';
+import {
+  createNewVault,
+  VaultAccount,
+  EncryptedVaultPayload,
+} from '@/lib/crypto/vaultCrypto';
+import {
+  Check,
+  Plus,
+  Trash2,
+  KeyRound,
+  Download,
+  ArrowRight,
+  Sparkles,
+  RefreshCw,
+  Copy,
+  Users,
+} from 'lucide-react';
+
+const DICEWARE_WORDLIST = [
+  'apple', 'battery', 'cable', 'desert', 'eagle', 'falcon', 'galaxy',
+  'harbor', 'island', 'jungle', 'lagos', 'meteor', 'nebula', 'ocean',
+  'planet', 'quantum', 'river', 'safari', 'thunder', 'voyage', 'whisper',
+  'zenith', 'beacon', 'canyon', 'delta', 'ember', 'forest', 'glacier'
+];
+
+function generateDicewarePassphrase(): string {
+  const words: string[] = [];
+  const randomBytes = new Uint8Array(5);
+  window.crypto.getRandomValues(randomBytes);
+  for (let i = 0; i < 5; i++) {
+    words.push(DICEWARE_WORDLIST[randomBytes[i] % DICEWARE_WORDLIST.length]);
+  }
+  return words.join('-');
+}
 
 export default function EnrollPage() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [username, setUsername] = useState('damisileayoola@gmail.com');
-  const [capturedVector, setCapturedVector] = useState<Uint8Array | null>(null);
-  const [pin, setPin] = useState('');
+  const [passphrase, setPassphrase] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [hashingProgress, setHashingProgress] = useState<string | null>(null);
   const [createdVault, setCreatedVault] = useState<EncryptedVaultPayload | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   // Default demo accounts (realistic sample TOTP secrets)
   const [accounts, setAccounts] = useState<VaultAccount[]>([
     {
       id: 'acc-1',
-      service: 'Google',
+      service: 'Google Workspace',
       accountName: 'damisileayoola@gmail.com',
       secret: 'JBSWY3DPEHPK3PXP', // Base32 test secret
     },
@@ -31,21 +62,20 @@ export default function EnrollPage() {
     },
     {
       id: 'acc-3',
-      service: 'AWS Console',
+      service: 'AWS Production',
       accountName: 'root-admin',
       secret: 'MZXW6YTBOI======',
     },
   ]);
 
-  const handleVectorCaptured = (vector: Uint8Array) => {
-    setCapturedVector(vector);
-    setStep(2);
+  const handleGeneratePassphrase = () => {
+    setPassphrase(generateDicewarePassphrase());
   };
 
   const handleAddAccount = () => {
     const newAcc: VaultAccount = {
       id: `acc-${Date.now()}`,
-      service: 'Resend',
+      service: 'Resend / Cloud',
       accountName: 'dev@omni.id',
       secret: 'JBSWY3DPEHPK3PXP',
     };
@@ -63,10 +93,18 @@ export default function EnrollPage() {
   };
 
   const handleFinalizeEnrollment = async () => {
-    if (!capturedVector || pin.length < 4) return;
+    if (passphrase.trim().length < 8) {
+      alert('Passphrase must be at least 8 characters long.');
+      return;
+    }
     setIsProcessing(true);
+    setHashingProgress('Deriving key via Argon2id (64MB memory, 3 iterations)...');
+
     try {
-      const vault = await createVault(capturedVector, pin, accounts);
+      // Yield to let UI update
+      await new Promise((r) => setTimeout(r, 100));
+
+      const { vault } = await createNewVault(passphrase, accounts);
       setCreatedVault(vault);
 
       // Save encrypted vault to localStorage under user's handle
@@ -78,23 +116,45 @@ export default function EnrollPage() {
       setStep(4);
     } catch (err) {
       console.error('Enrollment error:', err);
-      alert('Failed to construct zero-knowledge vault: ' + String(err));
+      alert('Failed to construct vault: ' + String(err));
     } finally {
       setIsProcessing(false);
+      setHashingProgress(null);
     }
   };
 
-  const downloadRescueCard = () => {
+  const downloadRescueKit = () => {
     if (!createdVault) return;
-    const blob = new Blob([JSON.stringify(createdVault, null, 2)], {
+    const exportData = {
+      title: 'OmniID Emergency Rescue Kit',
+      username,
+      createdAt: createdVault.createdAt,
+      instructions:
+        'Keep this file safe. Any 3 Shamir shares reconstruct your Master Key without your passphrase.',
+      shares: createdVault.shamirShares,
+      encryptedVault: {
+        version: createdVault.version,
+        vaultIv: createdVault.vaultIv,
+        vaultCiphertext: createdVault.vaultCiphertext,
+        wrappedMasterKey: createdVault.wrappedMasterKey,
+      },
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
       type: 'application/json',
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `omni-id-rescue-${username.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
+    a.download = `omni-id-rescue-kit-${username.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleCopyShare = (hex: string, index: number) => {
+    navigator.clipboard.writeText(hex);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
   };
 
   return (
@@ -106,9 +166,9 @@ export default function EnrollPage() {
             <KeyRound className="h-3.5 w-3.5" />
             <span>Lifeline Setup Wizard</span>
           </div>
-          <h1 className="text-3xl font-extrabold text-white">Enroll Your Biometric Lifeline</h1>
+          <h1 className="text-3xl font-extrabold text-white">Enroll Emergency Recovery Lifeline</h1>
           <p className="text-xs text-zinc-400 mt-1">
-            Zero raw face data is stored. Your face vector is scrambled with BCH error-correction math.
+            Zero single points of failure. Protected by Argon2id and 3-of-5 Shamir Secret Sharing.
           </p>
 
           {/* Stepper Dots */}
@@ -128,10 +188,15 @@ export default function EnrollPage() {
           </div>
         </div>
 
-        {/* STEP 1: Face Scan */}
+        {/* STEP 1: Handle Setup */}
         {step === 1 && (
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 shadow-xl backdrop-blur-md">
-            <div className="mb-4">
+            <h3 className="text-base font-bold text-white mb-1">Step 1: Identity Handle</h3>
+            <p className="text-xs text-zinc-400 mb-4">
+              Enter your email or unique developer handle. This identifies your vault during recovery.
+            </p>
+
+            <div className="mb-6">
               <label className="block text-xs font-semibold text-zinc-300 mb-1">
                 Your Primary Handle or Email
               </label>
@@ -144,31 +209,60 @@ export default function EnrollPage() {
               />
             </div>
 
-            <div className="mt-6">
-              <p className="text-xs font-medium text-zinc-300 mb-3 text-center">
-                Scan your face to generate biological key share ($K_1$)
-              </p>
-              <CameraFeed onCaptureVector={handleVectorCaptured} isProcessing={isProcessing} />
+            <div className="flex justify-end">
+              <button
+                type="button"
+                disabled={!username.trim()}
+                onClick={() => setStep(2)}
+                className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-2.5 text-xs font-bold text-zinc-950 transition hover:from-emerald-400 hover:to-teal-400 disabled:opacity-40"
+              >
+                <span>Continue</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
         )}
 
-        {/* STEP 2: Twin-Shield PIN */}
+        {/* STEP 2: Passphrase Setup */}
         {step === 2 && (
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 shadow-xl backdrop-blur-md text-center">
-            <div className="max-w-sm mx-auto mb-6">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mx-auto mb-3">
-                <Shield className="h-6 w-6" />
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 shadow-xl backdrop-blur-md">
+            <h3 className="text-base font-bold text-white mb-1">Step 2: Mental Master Passphrase</h3>
+            <p className="text-xs text-zinc-400 mb-5">
+              This passphrase wraps your Master Key using memory-hard **Argon2id**. 
+              You can memorize it or use our Diceware generator.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-zinc-300">
+                    High-Entropy Passphrase
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGeneratePassphrase}
+                    className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>Generate Diceware Words</span>
+                  </button>
+                </div>
+
+                <input
+                  type="text"
+                  value={passphrase}
+                  onChange={(e) => setPassphrase(e.target.value)}
+                  placeholder="e.g. correct-horse-battery-staple-lagos"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm font-mono text-emerald-300 placeholder-zinc-600 focus:border-emerald-500 focus:outline-none"
+                />
               </div>
-              <h3 className="text-lg font-bold text-white">Set Your 4-Digit Twin-Shield PIN</h3>
-              <p className="text-xs text-zinc-400 mt-1">
-                This mental factor prevents identical twins, siblings, or 3D masks from opening your vault.
-              </p>
+
+              <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-3 text-xs text-zinc-400">
+                <span className="font-semibold text-emerald-400">Security Rule:</span> Even if our servers are fully compromised, attackers cannot crack this passphrase without evaluating 64MB of memory per guess.
+              </div>
             </div>
 
-            <PinPad pin={pin} onChange={setPin} label="Enter 4-Digit Private PIN" />
-
-            <div className="mt-6 flex justify-between gap-3 max-w-sm mx-auto">
+            <div className="mt-8 flex justify-between gap-3">
               <button
                 type="button"
                 onClick={() => setStep(1)}
@@ -178,9 +272,9 @@ export default function EnrollPage() {
               </button>
               <button
                 type="button"
-                disabled={pin.length < 4}
+                disabled={passphrase.trim().length < 8}
                 onClick={() => setStep(3)}
-                className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-2 text-xs font-bold text-zinc-950 transition hover:from-emerald-400 hover:to-teal-400 disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-2.5 text-xs font-bold text-zinc-950 transition hover:from-emerald-400 hover:to-teal-400 disabled:opacity-40"
               >
                 <span>Continue</span>
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -196,7 +290,7 @@ export default function EnrollPage() {
               <div>
                 <h3 className="text-base font-bold text-white">Emergency Accounts to Protect</h3>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  These secrets will be encrypted using K = Face ⊕ PIN.
+                  These secrets will be encrypted using your 256-bit AES-GCM Master Key.
                 </p>
               </div>
 
@@ -266,41 +360,92 @@ export default function EnrollPage() {
                 onClick={handleFinalizeEnrollment}
                 className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-2.5 text-xs font-bold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:from-emerald-400 hover:to-teal-400 disabled:opacity-40"
               >
-                <Sparkles className="h-4 w-4" />
-                <span>{isProcessing ? 'Encrypting with WebCrypto...' : 'Lock Biometric Vault'}</span>
+                {isProcessing ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>{hashingProgress || 'Encrypting Vault...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    <span>Lock Vault & Generate Shamir Shares</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP 4: Success & Portable Backup */}
-        {step === 4 && (
-          <div className="rounded-2xl border border-emerald-500/40 bg-zinc-900/60 p-8 shadow-2xl backdrop-blur-md text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 mx-auto mb-4">
-              <Check className="h-8 w-8 stroke-[3]" />
+        {/* STEP 4: Success & Shamir 3-of-5 Share Distribution */}
+        {step === 4 && createdVault && (
+          <div className="rounded-2xl border border-emerald-500/40 bg-zinc-900/60 p-6 sm:p-8 shadow-2xl backdrop-blur-md">
+            <div className="text-center mb-6">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 mx-auto mb-3">
+                <Check className="h-7 w-7 stroke-[3]" />
+              </div>
+
+              <h2 className="text-2xl font-extrabold text-white">Vault Encrypted & Anchored!</h2>
+              <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
+                Your 256-bit Master Key has been split into **5 Shamir shares**. 
+                Any 3 shares recover your accounts without needing your passphrase.
+              </p>
             </div>
 
-            <h2 className="text-2xl font-extrabold text-white">Vault Encrypted & Anchored!</h2>
-            <p className="text-xs text-zinc-400 mt-2 max-w-md mx-auto">
-              Your biometric helper data and encrypted accounts are safely stored. 
-              If your phone dies or gets stolen right now, you can recover access from any device.
-            </p>
+            {/* Shamir Shares List */}
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center justify-between text-xs font-semibold text-zinc-300">
+                <span className="flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-emerald-400" />
+                  Your 3-of-5 Shamir Recovery Shares:
+                </span>
+                <span className="text-[11px] text-zinc-500">Threshold: 3 required</span>
+              </div>
 
-            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+              {createdVault.shamirShares.map((share) => (
+                <div
+                  key={share.index}
+                  className="rounded-xl border border-zinc-800 bg-zinc-950/80 p-3 text-xs"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold text-emerald-400">
+                      Share #{share.index}: {share.label}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyShare(share.shareHex, share.index)}
+                      className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white"
+                    >
+                      {copiedIndex === share.index ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                      <span>{copiedIndex === share.index ? 'Copied' : 'Copy Share'}</span>
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 mb-1.5">{share.description}</p>
+                  <p className="font-mono text-[10px] text-zinc-300 break-all bg-zinc-900/60 p-1.5 rounded border border-zinc-800/80 select-all">
+                    {share.shareHex}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 border-t border-zinc-800 pt-6">
               <button
                 type="button"
-                onClick={downloadRescueCard}
+                onClick={downloadRescueKit}
                 className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800 px-5 py-2.5 text-xs font-semibold text-zinc-200 transition hover:bg-zinc-700 hover:text-white"
               >
                 <Download className="h-4 w-4" />
-                <span>Download Rescue Card (.json)</span>
+                <span>Download Rescue Kit (.json)</span>
               </button>
 
               <Link
                 href="/recover"
                 className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-2.5 text-xs font-bold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:from-emerald-400 hover:to-teal-400"
               >
-                <span>Test Recovery Flow Now</span>
+                <span>Test Recovery Flow</span>
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>

@@ -11,7 +11,8 @@ import {
   CheckCircle2,
   AlertOctagon,
   EyeOff,
-  Cpu,
+  KeyRound,
+  FileText,
   Sparkles,
 } from 'lucide-react';
 
@@ -28,7 +29,7 @@ export default function HomePage() {
             <div className="lg:col-span-7 flex flex-col items-start gap-6">
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-semibold text-emerald-400">
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>Hardware-Free Biometric Disaster Recovery</span>
+                <span>Hardware-Independent Emergency Recovery Protocol</span>
               </div>
 
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white leading-[1.1]">
@@ -40,9 +41,9 @@ export default function HomePage() {
               </h1>
 
               <p className="text-base sm:text-lg text-zinc-400 leading-relaxed max-w-2xl">
-                When power cuts hit in Lagos, batteries drop to 0%, or your phone gets snatched in transit, 
-                you lose access to AWS, GitHub, Google, and your clients. 
-                OmniID anchors your emergency 2FA codes directly to your face + mental PIN—zero apps, zero hardware, zero raw biometric storage.
+                When power outages hit in Lagos, batteries drop to 0%, or your phone is lost in transit, 
+                you lose access to AWS, GitHub, Google, and client deployments. 
+                OmniID provides a zero-hardware disaster recovery lifeline powered by **Argon2id** and **3-of-5 Shamir Secret Sharing**.
               </p>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
@@ -59,23 +60,23 @@ export default function HomePage() {
                   className="flex items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 px-6 py-3.5 text-sm font-semibold text-zinc-200 transition hover:bg-zinc-800 hover:text-white"
                 >
                   <Shield className="h-4 w-4 text-emerald-400" />
-                  <span>Enroll Free Lifeline Vault</span>
+                  <span>Set Up Recovery Lifeline</span>
                 </Link>
               </div>
 
-              {/* Trust Badges */}
+              {/* Security Pill Badges */}
               <div className="flex flex-wrap items-center gap-6 pt-4 text-xs text-zinc-400">
                 <span className="flex items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                  100% Client-Side WebCrypto
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <EyeOff className="h-4 w-4 text-emerald-400" />
-                  Zero Raw Face Storage
+                  Argon2id (64MB / 3 iterations)
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Users className="h-4 w-4 text-emerald-400" />
-                  Twin-Shield Protected
+                  Shamir 3-of-5 Secret Sharing
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <EyeOff className="h-4 w-4 text-emerald-400" />
+                  Anti-DOM Scraping Canvas
                 </span>
               </div>
             </div>
@@ -101,9 +102,9 @@ export default function HomePage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80" />
                   <div className="absolute bottom-3 left-3 right-3 rounded-lg bg-zinc-900/90 border border-zinc-700/60 p-2.5 text-xs text-zinc-300 backdrop-blur-md">
-                    <p className="font-semibold text-white">Your Infinix is dead at 0% battery.</p>
+                    <p className="font-semibold text-white">Your Infinix phone is dead at 0% battery.</p>
                     <p className="text-[11px] text-zinc-400 mt-0.5">
-                      How do you push code to GitHub or deploy to AWS right now?
+                      How do you push a hotfix to GitHub or deploy to AWS right now?
                     </p>
                   </div>
                 </div>
@@ -113,7 +114,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* The Twin Parity Defense Section */}
+      {/* Honest Architecture & Threat Defense Section */}
       <section className="py-20 border-b border-zinc-900 bg-zinc-950/50">
         <div className="container mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center max-w-3xl mx-auto mb-16">
@@ -121,11 +122,11 @@ export default function HomePage() {
               Cryptographic Threat Mitigation
             </h2>
             <h3 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-              &quot;What about identical twins?&quot;
+              Why Real Cryptography Beats Gimmicks
             </h3>
             <p className="text-sm sm:text-base text-zinc-400 mt-3">
-              Apple Face ID admits identical twins share near-identical bone structure. 
-              Here is how OmniID mathematically neutralizes twin impersonation:
+              Unstable face embeddings drift with lighting and aging, and 4-digit PINs fail offline in seconds. 
+              OmniID uses provably secure, audited primitives:
             </p>
           </div>
 
@@ -133,196 +134,111 @@ export default function HomePage() {
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 flex flex-col justify-between">
               <div>
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mb-4">
-                  <Cpu className="h-6 w-6" />
+                  <Lock className="h-6 w-6" />
                 </div>
-                <h4 className="text-lg font-bold text-white">Factor 1: Face Vector</h4>
+                <h4 className="text-lg font-bold text-white">Argon2id Memory Hardening</h4>
                 <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                  Webcam extracts 512-bit geometric feature embeddings. In a Fuzzy Commitment Scheme, 
-                  this recovers the biological key share $K_1$. It replaces carrying physical hardware.
+                  Your Master Key is wrapped using a high-entropy passphrase passed through Argon2id 
+                  (64MB memory cost, 3 iterations). Offline GPU password cracking is computationally intractable.
                 </p>
               </div>
               <div className="mt-4 pt-4 border-t border-zinc-800/80 text-[11px] font-mono text-emerald-400">
-                Shared between twins
+                Password Hashing Standard Winner
               </div>
             </div>
 
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 flex flex-col justify-between">
               <div>
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400 mb-4">
-                  <Lock className="h-6 w-6" />
+                  <Users className="h-6 w-6" />
                 </div>
-                <h4 className="text-lg font-bold text-white">Factor 2: Twin-Shield PIN</h4>
+                <h4 className="text-lg font-bold text-white">3-of-5 Shamir Secret Sharing</h4>
                 <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                  A memorized 4-digit PIN is salted via Argon2id into key share $K_2$. 
-                  Your identical twin can match your face, but without this mental secret, the vault cannot unlock.
+                  The Master Key is split across 5 independent shares: your device, printed emergency card, trusted contact, 
+                  and offline backup. Any 3 shares reconstruct the vault without needing a central server.
                 </p>
               </div>
               <div className="mt-4 pt-4 border-t border-zinc-800/80 text-[11px] font-mono text-teal-400">
-                Private to your brain
+                No Single Point of Failure
               </div>
             </div>
 
             <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/10 p-6 flex flex-col justify-between shadow-lg shadow-emerald-950/20">
               <div>
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 mb-4">
-                  <Shield className="h-6 w-6" />
+                  <EyeOff className="h-6 w-6" />
                 </div>
-                <h4 className="text-lg font-bold text-white">Reconstruction: K = K1 ⊕ K2</h4>
+                <h4 className="text-lg font-bold text-white">Isolated Canvas + Auto-Zeroize</h4>
                 <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                  The AES-256-GCM vault key only forms in volatile RAM when both shares align. 
-                  A twin entering a wrong PIN produces pure mathematical noise.
+                  Decrypted TOTP codes are drawn strictly to an HTML5 canvas with sub-pixel noise. 
+                  They never exist in the HTML DOM, neutralizing browser scrapers. RAM is wiped clean after 45 seconds.
                 </p>
               </div>
               <div className="mt-4 pt-4 border-t border-emerald-500/20 text-[11px] font-mono text-emerald-300">
-                Zero-Knowledge Defense
+                Volatile Memory Only
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 3-Tier Pricing Model */}
+      {/* How Recovery Works */}
       <section className="py-20 border-b border-zinc-900">
         <div className="container mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <h2 className="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-2">
-              Transparent Developer Pricing
+              The Borrowed-Device Workflow
             </h2>
             <h3 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-              Built for survival, priced for developers
+              2 Ways to Recover When Disaster Strikes
             </h3>
-            <p className="text-sm text-zinc-400 mt-3">
-              Start free today. Upgrade for unlimited accounts or drop our Recovery SDK into your own startup.
-            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Free Lifeline */}
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8 flex flex-col justify-between">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 flex flex-col justify-between">
               <div>
-                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  Tier 1: Lifeline
-                </span>
-                <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-extrabold text-white">$0</span>
-                  <span className="text-xs text-zinc-400">/ forever</span>
+                <div className="flex items-center gap-2 text-emerald-400 mb-3">
+                  <KeyRound className="h-5 w-5" />
+                  <span className="text-xs font-bold uppercase tracking-wider">Fast Path</span>
                 </div>
-                <p className="text-xs text-zinc-400 mt-3">
-                  Essential disaster recovery for individual developers and remote workers.
+                <h4 className="text-xl font-bold text-white">1. Mental Passphrase</h4>
+                <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
+                  Sit at any friend&apos;s computer or cybercafé PC in incognito mode. Enter your handle and mental passphrase. 
+                  Argon2id unwraps your vault in volatile browser memory within seconds.
                 </p>
-
-                <ul className="mt-6 space-y-3 text-xs text-zinc-300">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span>3 Critical TOTP Accounts (Google, GitHub, AWS)</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span>Active Chromatic Anti-Spoofing</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span>Twin-Shield PIN Protection</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span>1 Emergency Recovery Session / month</span>
-                  </li>
-                </ul>
               </div>
-
-              <Link
-                href="/enroll"
-                className="mt-8 block text-center rounded-xl border border-zinc-700 bg-zinc-800 py-2.5 text-xs font-semibold text-white transition hover:bg-zinc-700"
-              >
-                Enroll Free
-              </Link>
+              <div className="mt-6 pt-4 border-t border-zinc-800">
+                <Link
+                  href="/recover"
+                  className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                >
+                  <span>Test Passphrase Recovery</span>
+                  <span>&rarr;</span>
+                </Link>
+              </div>
             </div>
 
-            {/* Pro Dev - Highlighted */}
-            <div className="relative rounded-2xl border-2 border-emerald-500 bg-zinc-900/80 p-8 flex flex-col justify-between shadow-2xl shadow-emerald-500/10">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-emerald-500 px-3 py-0.5 text-[10px] font-bold text-zinc-950 uppercase tracking-wider">
-                Most Popular for Devs
-              </div>
-
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 flex flex-col justify-between">
               <div>
-                <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
-                  Tier 2: Pro Dev
-                </span>
-                <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-extrabold text-white">$39</span>
-                  <span className="text-xs text-zinc-400">Lifetime Deal (or $4/mo)</span>
+                <div className="flex items-center gap-2 text-teal-400 mb-3">
+                  <FileText className="h-5 w-5" />
+                  <span className="text-xs font-bold uppercase tracking-wider">Break-Glass Path</span>
                 </div>
-                <p className="text-xs text-zinc-400 mt-3">
-                  Pay once via card or crypto (USDT/SOL). Never get locked out of your career again.
+                <h4 className="text-xl font-bold text-white">2. Shamir 3-of-5 Rescue Shares</h4>
+                <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
+                  Forgot your passphrase? Combine any 3 of your distributed shares (e.g. printed paper card + trusted contact share + cloud share) 
+                  to restore your Master Key mathematically.
                 </p>
-
-                <ul className="mt-6 space-y-3 text-xs text-zinc-300">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span className="font-semibold text-white">Unlimited TOTP & Backup Codes</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span className="font-semibold text-white">Duress Decoy Vault Mode</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span>Encrypted SSH Keys & Env Variables</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span>Unlimited Emergency Recoveries</span>
-                  </li>
-                </ul>
               </div>
-
-              <Link
-                href="/enroll"
-                className="mt-8 block text-center rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-2.5 text-xs font-bold text-zinc-950 shadow-lg shadow-emerald-500/25 transition hover:from-emerald-400 hover:to-teal-400"
-              >
-                Claim $39 Lifetime Pass
-              </Link>
-            </div>
-
-            {/* B2B Recovery SDK */}
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-8 flex flex-col justify-between">
-              <div>
-                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  Tier 3: Recovery SDK
-                </span>
-                <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-extrabold text-white">$0.04</span>
-                  <span className="text-xs text-zinc-400">/ active recovery</span>
-                </div>
-                <p className="text-xs text-zinc-400 mt-3">
-                  For crypto exchanges, fintechs, and freelancer platforms to cut account-reset support costs.
-                </p>
-
-                <ul className="mt-6 space-y-3 text-xs text-zinc-300">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span>Drop-in React Component (`npm i @omni-id/react`)</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span>First 1,000 Recoveries Free</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span>Webhook Audit Trail & Alerts</span>
-                  </li>
-                </ul>
+              <div className="mt-6 pt-4 border-t border-zinc-800">
+                <Link
+                  href="/recover"
+                  className="text-xs font-semibold text-teal-400 hover:text-teal-300 flex items-center gap-1"
+                >
+                  <span>Test Shamir Break-Glass Recovery</span>
+                  <span>&rarr;</span>
+                </Link>
               </div>
-
-              <a
-                href="https://github.com/Ayoola-tech2024/OmniID"
-                target="_blank"
-                rel="noreferrer"
-                className="mt-8 block text-center rounded-xl border border-zinc-700 bg-zinc-800 py-2.5 text-xs font-semibold text-white transition hover:bg-zinc-700"
-              >
-                View SDK Docs
-              </a>
             </div>
           </div>
         </div>
@@ -330,9 +246,9 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="py-8 text-center text-xs text-zinc-400 border-t border-zinc-900">
-        <p>OmniID © 2026. Universal Hardware-Independent Biometric Recovery Protocol.</p>
-        <p className="mt-1 text-[11px] text-zinc-400">
-          Built in Lagos, Nigeria for developers, crypto traders, and remote workers globally.
+        <p>OmniID © 2026. Open-Source Disaster Recovery Protocol.</p>
+        <p className="mt-1 text-[11px] text-zinc-500">
+          Built for developers, remote workers, and crypto users who cannot afford hardware lockouts.
         </p>
       </footer>
     </div>
