@@ -2,8 +2,9 @@
 
 import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { KeyRound, ArrowRight, Lock, Users, EyeOff } from 'lucide-react';
+
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 export default function HomePage() {
   return (
@@ -67,13 +68,14 @@ export default function HomePage() {
                 </div>
 
                 <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
-                  <Image
-                    src="/images/infinix-lockout.png"
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`${basePath}/images/infinix-lockout.png`}
                     alt="Google prompt asking to verify on Infinix HOT 50i"
-                    width={800}
-                    height={480}
+                    width={1024}
+                    height={639}
                     className="w-full h-auto object-cover opacity-95"
-                    priority
+                    loading="eager"
                   />
                   <div className="border-t border-zinc-800 bg-zinc-900/90 p-3 text-xs text-zinc-400">
                     <p className="text-zinc-200 font-medium">When you cannot tap your phone:</p>

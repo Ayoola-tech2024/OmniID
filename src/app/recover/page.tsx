@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export default function RecoverPage() {
-  const [username, setUsername] = useState('damisileayoola@gmail.com');
+  const [username, setUsername] = useState('');
   const [stage, setStage] = useState<'identify' | 'auth' | 'unlocked'>('identify');
   const [recoveryMode, setRecoveryMode] = useState<'passphrase' | 'shamir'>('passphrase');
   const [vaultPayload, setVaultPayload] = useState<EncryptedVaultPayload | null>(null);
@@ -33,7 +33,7 @@ export default function RecoverPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const latestUser = localStorage.getItem('omni_latest_user') || 'damisileayoola@gmail.com';
+      const latestUser = localStorage.getItem('omni_latest_user') || '';
       setUsername(latestUser);
       const cached = localStorage.getItem(`omni_vault_${latestUser}`);
       if (cached) {

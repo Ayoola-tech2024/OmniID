@@ -11,7 +11,7 @@
 export interface VaultAccount {
   id: string;
   service: string; // e.g. "Google", "GitHub", "AWS", "Resend"
-  accountName: string; // e.g. "damisileayoola@gmail.com"
+  accountName: string; // e.g. "user@example.com"
   secret: string; // Base32 TOTP secret key
   digits?: number;
   period?: number;

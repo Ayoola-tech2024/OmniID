@@ -35,7 +35,7 @@ function generateDicewarePassphrase(): string {
 
 export default function EnrollPage() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [username, setUsername] = useState('damisileayoola@gmail.com');
+  const [username, setUsername] = useState('user@example.com');
   const [passphrase, setPassphrase] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [hashingProgress, setHashingProgress] = useState<string | null>(null);
@@ -46,7 +46,7 @@ export default function EnrollPage() {
     {
       id: 'acc-1',
       service: 'Google Workspace',
-      accountName: 'damisileayoola@gmail.com',
+      accountName: 'user@example.com',
       secret: 'JBSWY3DPEHPK3PXP',
     },
     {
