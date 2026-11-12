@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   createNewVault,
   generateRescueKitFile,
-  generateSeparateShareCards,
+  generateDicewarePassphrase,
   evaluatePassphraseEntropy,
   VaultAccount,
   EncryptedVaultPayload,
@@ -18,8 +18,8 @@ import {
   Copy,
   Check,
   Download,
-  FileText,
-  AlertCircle,
+  ShieldCheck,
+  CheckCircle2,
 } from 'lucide-react';
 
 export default function EnrollPage() {
@@ -32,6 +32,15 @@ export default function EnrollPage() {
   const [createdShares, setCreatedShares] = useState<ShamirShareMeta[]>([]);
   const [primaryShare, setPrimaryShare] = useState<ShamirShareMeta | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  // Stepper for distributing shares 1 through 5 one by one
+  const [distributionStep, setDistributionStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(1);
+  const [hasDownloadedRescueKit, setHasDownloadedRescueKit] = useState(false);
+  const [confirmedShare1, setConfirmedShare1] = useState(false);
+  const [confirmedShare2, setConfirmedShare2] = useState(false);
+  const [confirmedShare3, setConfirmedShare3] = useState(false);
+  const [confirmedShare4, setConfirmedShare4] = useState(false);
+  const [confirmedShare5, setConfirmedShare5] = useState(false);
 
   const [accounts, setAccounts] = useState<VaultAccount[]>([
     {
@@ -57,19 +66,8 @@ export default function EnrollPage() {
   const passphraseEntropy = evaluatePassphraseEntropy(passphrase);
 
   const handleGeneratePassphrase = () => {
-    const wordList = [
-      'apple', 'battery', 'lagos', 'quantum', 'river',
-      'harbor', 'timber', 'summit', 'falcon', 'nebula',
-      'copper', 'meadow', 'orbit', 'breeze', 'granite',
-      'canyon', 'beacon', 'shield', 'atlas', 'cipher',
-    ];
-    const picked: string[] = [];
-    const array = new Uint32Array(5);
-    window.crypto.getRandomValues(array);
-    for (let i = 0; i < 5; i++) {
-      picked.push(wordList[array[i] % wordList.length]);
-    }
-    setPassphrase(picked.join('-'));
+    const generated = generateDicewarePassphrase();
+    setPassphrase(generated);
   };
 
   const handleAddAccount = () => {
@@ -101,7 +99,7 @@ export default function EnrollPage() {
       return;
     }
     if (!passphraseEntropy.isValid) {
-      alert(passphraseEntropy.feedback);
+      alert(passphraseEntropy.warning || passphraseEntropy.suggestion);
       return;
     }
 
@@ -122,7 +120,6 @@ export default function EnrollPage() {
       setPrimaryShare(pShare);
 
       if (typeof window !== 'undefined') {
-        // CRITICAL SECURITY INVARIANT:
         // Save encrypted vault + ONLY Share 1 (primary device share).
         // NEVER store shares 2, 3, 4, 5 in localStorage!
         const localRecord = {
@@ -134,6 +131,7 @@ export default function EnrollPage() {
       }
 
       setStep(4);
+      setDistributionStep(1);
     } catch (err) {
       console.error('Enrollment error:', err);
       alert('Could not create vault: ' + String(err));
@@ -156,6 +154,7 @@ export default function EnrollPage() {
     a.download = `omni-id-rescue-kit-${username.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    setHasDownloadedRescueKit(true);
   };
 
   const downloadIndividualShare = (share: ShamirShareMeta) => {
@@ -166,10 +165,11 @@ export default function EnrollPage() {
       `Identifier:   ${username}\n` +
       `Share Label:  ${share.label}\n` +
       `Description:  ${share.description}\n\n` +
-      `CRITICAL INSTRUCTIONS:\n` +
-      `1. This share alone CANNOT decrypt your vault.\n` +
-      `2. Any 3 of the 5 shares reconstruct your Master Key without a passphrase.\n` +
-      `3. Store this file in a SEPARATE location from your other shares and Rescue Kit.\n\n` +
+      `CRITICAL SECURITY INSTRUCTIONS:\n` +
+      `1. This single share CANNOT decrypt your vault.\n` +
+      `2. Any 3 of the 5 shares reconstruct your Master Key without your passphrase.\n` +
+      `3. Store this file in a SEPARATE physical or digital location from your other shares.\n` +
+      `4. NEVER store multiple shares in the same folder or computer.\n\n` +
       `RECOVERY SHARE HEX:\n` +
       `${share.shareHex}\n\n` +
       `============================================================\n`;
@@ -179,39 +179,6 @@ export default function EnrollPage() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `omni-id-share-${share.index}-${share.label.toLowerCase().replace(/[^a-z0-9]/g, '-')}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const downloadAllOffsiteShares = () => {
-    if (createdShares.length === 0) return;
-    const cards = generateSeparateShareCards(username, createdShares);
-
-    const fullBundle =
-      `============================================================\n` +
-      `OMNIID DISTRIBUTED RECOVERY SHARES BUNDLE (SHARES 2 TO 5)\n` +
-      `============================================================\n\n` +
-      `SECURITY INVARIANT:\n` +
-      `You must SEPARATE these shares immediately.\n` +
-      `Store each share in a different place (printed paper card, trusted contact, USB, cloud).\n` +
-      `Threshold: Any 3 shares reconstruct your master key.\n\n` +
-      cards
-        .slice(1) // Shares 2 to 5
-        .map(
-          (c) =>
-            `------------------------------------------------------------\n` +
-            `SHARE ${c.shareIndex} OF 5: ${c.label}\n` +
-            `Destination: ${c.description}\n` +
-            `Share Hex:\n${c.shareHex}\n`
-        )
-        .join('\n') +
-      `\n============================================================\n`;
-
-    const blob = new Blob([fullBundle], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `omni-id-offsite-shares-2-to-5-${username.replace(/[^a-zA-Z0-9]/g, '_')}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -276,13 +243,13 @@ export default function EnrollPage() {
               <button
                 type="button"
                 onClick={handleGeneratePassphrase}
-                className="text-xs text-zinc-400 hover:text-white underline"
+                className="text-xs text-zinc-300 hover:text-white underline font-medium"
               >
-                Generate 5 random words
+                Generate 6 Diceware words
               </button>
             </div>
             <p className="text-xs text-zinc-400 mb-4">
-              OmniID derives your key using Argon2id (64 MB RAM, 3 iterations) so brute-force attempts require dedicated memory per guess.
+              OmniID derives your key using Argon2id (64 MB RAM, 3 iterations). Enter a strong passphrase or generate 6 random words.
             </p>
 
             <div className="space-y-3">
@@ -290,26 +257,53 @@ export default function EnrollPage() {
                 type="text"
                 value={passphrase}
                 onChange={(e) => setPassphrase(e.target.value)}
-                placeholder="e.g. apple-battery-lagos-quantum-river"
+                placeholder="e.g. boulder-glacier-falcon-meadow-timber-summit"
                 className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm font-mono text-zinc-200 placeholder-zinc-600 focus:border-zinc-400 focus:outline-none"
               />
 
-              {/* Entropy / Strength Indicator */}
-              <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-zinc-400">Entropy Strength:</span>
-                  <span
-                    className={`font-semibold ${
-                      passphraseEntropy.isValid ? 'text-emerald-400' : 'text-amber-400'
-                    }`}
-                  >
-                    ~{passphraseEntropy.estimatedBits} bits ({passphraseEntropy.wordCount} words, {passphraseEntropy.charCount} chars)
-                  </span>
+              {/* Realistic zxcvbn Strength Indicator */}
+              {passphrase.trim().length > 0 && (
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3.5 text-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-zinc-400">Passphrase Strength:</span>
+                    <span
+                      className={`font-semibold ${
+                        passphraseEntropy.score >= 3 ? 'text-emerald-400' : 'text-amber-400'
+                      }`}
+                    >
+                      {passphraseEntropy.scoreLabel} (Score {passphraseEntropy.score}/4)
+                    </span>
+                  </div>
+
+                  {/* 4-bar strength meter */}
+                  <div className="grid grid-cols-4 gap-1.5 mb-2">
+                    {[1, 2, 3, 4].map((bar) => (
+                      <div
+                        key={bar}
+                        className={`h-1.5 rounded-full ${
+                          bar <= passphraseEntropy.score
+                            ? passphraseEntropy.score >= 3
+                              ? 'bg-emerald-500'
+                              : 'bg-amber-500'
+                            : 'bg-zinc-800'
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  {passphraseEntropy.warning && (
+                    <p className="text-[11px] text-amber-300 font-medium mb-1">
+                      ⚠️ {passphraseEntropy.warning}
+                    </p>
+                  )}
+                  <p className="text-[11px] text-zinc-400">
+                    {passphraseEntropy.suggestion}
+                  </p>
+                  <p className="text-[10px] text-zinc-500 mt-1 font-mono">
+                    Estimated offline brute-force time: {passphraseEntropy.crackTimeDisplay}
+                  </p>
                 </div>
-                <p className="text-[11px] text-zinc-500">
-                  {passphraseEntropy.feedback}
-                </p>
-              </div>
+              )}
             </div>
 
             <div className="mt-6 flex justify-between gap-3 pt-3 border-t border-zinc-800/80">
@@ -413,140 +407,419 @@ export default function EnrollPage() {
           </div>
         )}
 
-        {/* STEP 4: Success & Share Distribution */}
-        {step === 4 && createdVault && (
+        {/* STEP 4: Forced One-by-One Share Distribution Stepper */}
+        {step === 4 && createdVault && createdShares.length === 5 && (
           <div className="space-y-6">
-            {/* Security Guarantee Notice */}
-            <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-5 text-xs text-emerald-200">
-              <div className="flex items-start gap-2.5">
-                <AlertCircle className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-semibold text-emerald-100 text-sm">
-                    Vault encrypted & 3-of-5 Shamir shares created
-                  </h4>
-                  <p className="mt-1 leading-relaxed text-emerald-200/90">
-                    Your Master Key has been split into five separate shares. Any 3 shares reconstruct your key without your passphrase.
-                    To preserve security, <strong>never store all 5 shares in the same file or place</strong>.
-                  </p>
-                </div>
+            {/* Top Stepper Indicator */}
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div>
+                <span className="text-xs text-zinc-500 font-mono">
+                  Distribution Step {distributionStep} of 5
+                </span>
+                <h2 className="text-base font-bold text-white mt-0.5">
+                  Distribute your recovery shares separately
+                </h2>
               </div>
-            </div>
-
-            {/* Rescue Kit JSON (Share 1) */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-white">1. Download Rescue Kit (.json)</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Contains your encrypted vault + <strong>Share 1 only</strong>. This file alone cannot open your vault.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={downloadRescueKit}
-                  className="flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-2 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 transition shrink-0"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  <span>Download Rescue Kit</span>
-                </button>
-              </div>
-
-              <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 text-[11px] font-mono text-zinc-400">
-                <span className="text-zinc-500">Includes: </span>
-                <span>Encrypted Ciphertext (AES-256-GCM) + Argon2id Wrapped Key + Share 1 (Local)</span>
-              </div>
-            </div>
-
-            {/* Offsite Shares (Shares 2 to 5) */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-white">2. Distribute Separate Offsite Shares</h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Store each share in a separate location. You will need any 2 of these to combine with Share 1.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={downloadAllOffsiteShares}
-                  className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 px-3.5 py-2 text-xs text-zinc-200 hover:bg-zinc-700 transition shrink-0"
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  <span>Download All Offsite Shares (.txt)</span>
-                </button>
-              </div>
-
-              {/* Individual Shares 1 to 5 */}
-              <div className="space-y-3">
-                {createdShares.map((share) => (
+              <div className="flex gap-1.5">
+                {[1, 2, 3, 4, 5].map((s) => (
                   <div
-                    key={share.index}
-                    className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white">
-                          Share {share.index}: {share.label}
-                        </span>
-                        {share.index === 1 && (
-                          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400 font-mono">
-                            In Rescue Kit
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => downloadIndividualShare(share)}
-                          className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 border border-zinc-800 rounded px-2 py-0.5"
-                          title="Download individual share card"
-                        >
-                          <Download className="h-3 w-3" />
-                          <span>Card</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleCopyShare(share.shareHex, share.index)}
-                          className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 border border-zinc-800 rounded px-2 py-0.5"
-                        >
-                          {copiedIndex === share.index ? (
-                            <>
-                              <Check className="h-3 w-3 text-emerald-400" />
-                              <span>Copied</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-3 w-3" />
-                              <span>Copy</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    <p className="text-[11px] text-zinc-500 mb-1.5">{share.description}</p>
-                    <p className="font-mono text-[10px] text-zinc-400 break-all bg-zinc-900 p-1.5 rounded select-all">
-                      {share.shareHex}
-                    </p>
-                  </div>
+                    key={s}
+                    className={`h-2 w-5 rounded-full transition ${
+                      s < distributionStep
+                        ? 'bg-emerald-500'
+                        : s === distributionStep
+                        ? 'bg-white'
+                        : 'bg-zinc-800'
+                    }`}
+                  />
                 ))}
               </div>
             </div>
 
-            {/* Test Recovery Flow Navigation */}
-            <div className="flex justify-end pt-2">
-              <Link
-                href="/recover"
-                className="flex items-center gap-1.5 rounded-lg bg-white px-5 py-2.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 transition"
-              >
-                <span>Proceed to recovery test</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
+            {/* DISTRIBUTION 1: Rescue Kit JSON (Vault + Share 1) */}
+            {distributionStep === 1 && (
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-lg bg-zinc-800 p-2 text-zinc-300">
+                    <Download className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">
+                      Share 1: Primary Rescue Kit (.json)
+                    </h3>
+                    <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                      Download your encrypted Rescue Kit. It contains your encrypted vault and <strong>Share 1 of 5 only</strong>. By itself, this file cannot unlock your vault.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={downloadRescueKit}
+                    className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 transition"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Download Rescue Kit JSON</span>
+                  </button>
+                </div>
+
+                <div className="pt-3 border-t border-zinc-800/80">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-300">
+                    <input
+                      type="checkbox"
+                      checked={confirmedShare1}
+                      onChange={(e) => setConfirmedShare1(e.target.checked)}
+                      className="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0"
+                    />
+                    <span>I have downloaded and stored my Rescue Kit file on this device.</span>
+                  </label>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    disabled={!hasDownloadedRescueKit || !confirmedShare1}
+                    onClick={() => setDistributionStep(2)}
+                    className="flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 transition disabled:opacity-40"
+                  >
+                    <span>Continue to Share 2</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* DISTRIBUTION 2: Share 2 (Paper Card) */}
+            {distributionStep === 2 && (
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">
+                    Share 2: Emergency Printed Paper Card
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                    Write down this share by hand in a notebook, or download the printable card file and store it physically away from your computer.
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] text-zinc-400 font-mono">Share 2 of 5</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => downloadIndividualShare(createdShares[1])}
+                        className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 border border-zinc-800 rounded px-2 py-0.5"
+                      >
+                        <Download className="h-3 w-3" />
+                        <span>Download Card</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyShare(createdShares[1].shareHex, 2)}
+                        className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 border border-zinc-800 rounded px-2 py-0.5"
+                      >
+                        {copiedIndex === 2 ? (
+                          <>
+                            <Check className="h-3 w-3 text-emerald-400" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="font-mono text-[10px] text-zinc-300 break-all select-all bg-zinc-900 p-2 rounded">
+                    {createdShares[1].shareHex}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-zinc-800/80">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-300">
+                    <input
+                      type="checkbox"
+                      checked={confirmedShare2}
+                      onChange={(e) => setConfirmedShare2(e.target.checked)}
+                      className="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0"
+                    />
+                    <span>I have written down or saved Share 2 in a separate physical location.</span>
+                  </label>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    disabled={!confirmedShare2}
+                    onClick={() => setDistributionStep(3)}
+                    className="flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 transition disabled:opacity-40"
+                  >
+                    <span>Continue to Share 3</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* DISTRIBUTION 3: Share 3 (Trusted Contact) */}
+            {distributionStep === 3 && (
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">
+                    Share 3: Trusted Contact / Attorney
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                    Give or send this share to your emergency contact (spouse, co-founder, partner, or legal representative). They cannot open your vault with this share alone.
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] text-zinc-400 font-mono">Share 3 of 5</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => downloadIndividualShare(createdShares[2])}
+                        className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 border border-zinc-800 rounded px-2 py-0.5"
+                      >
+                        <Download className="h-3 w-3" />
+                        <span>Download Card</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyShare(createdShares[2].shareHex, 3)}
+                        className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 border border-zinc-800 rounded px-2 py-0.5"
+                      >
+                        {copiedIndex === 3 ? (
+                          <>
+                            <Check className="h-3 w-3 text-emerald-400" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="font-mono text-[10px] text-zinc-300 break-all select-all bg-zinc-900 p-2 rounded">
+                    {createdShares[2].shareHex}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-zinc-800/80">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-300">
+                    <input
+                      type="checkbox"
+                      checked={confirmedShare3}
+                      onChange={(e) => setConfirmedShare3(e.target.checked)}
+                      className="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0"
+                    />
+                    <span>I have delivered or saved Share 3 for my trusted contact.</span>
+                  </label>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    disabled={!confirmedShare3}
+                    onClick={() => setDistributionStep(4)}
+                    className="flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 transition disabled:opacity-40"
+                  >
+                    <span>Continue to Share 4</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* DISTRIBUTION 4: Share 4 (Air-Gapped USB) */}
+            {distributionStep === 4 && (
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">
+                    Share 4: Secondary Hardware / Air-Gapped USB
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                    Save this share on an offline flash drive or secondary computer that is not connected to this machine.
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] text-zinc-400 font-mono">Share 4 of 5</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => downloadIndividualShare(createdShares[3])}
+                        className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 border border-zinc-800 rounded px-2 py-0.5"
+                      >
+                        <Download className="h-3 w-3" />
+                        <span>Download Card</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyShare(createdShares[3].shareHex, 4)}
+                        className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 border border-zinc-800 rounded px-2 py-0.5"
+                      >
+                        {copiedIndex === 4 ? (
+                          <>
+                            <Check className="h-3 w-3 text-emerald-400" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="font-mono text-[10px] text-zinc-300 break-all select-all bg-zinc-900 p-2 rounded">
+                    {createdShares[3].shareHex}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-zinc-800/80">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-300">
+                    <input
+                      type="checkbox"
+                      checked={confirmedShare4}
+                      onChange={(e) => setConfirmedShare4(e.target.checked)}
+                      className="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0"
+                    />
+                    <span>I have saved Share 4 on an offline hardware drive or secondary device.</span>
+                  </label>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    disabled={!confirmedShare4}
+                    onClick={() => setDistributionStep(5)}
+                    className="flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 transition disabled:opacity-40"
+                  >
+                    <span>Continue to Share 5</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* DISTRIBUTION 5: Share 5 (Offsite Cloud / Safe) */}
+            {distributionStep === 5 && (
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">
+                    Share 5: Offsite Cloud / Safety Deposit Box
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                    Store this final share in a separate encrypted cloud account, cold email archive, or safety deposit box.
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] text-zinc-400 font-mono">Share 5 of 5</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => downloadIndividualShare(createdShares[4])}
+                        className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 border border-zinc-800 rounded px-2 py-0.5"
+                      >
+                        <Download className="h-3 w-3" />
+                        <span>Download Card</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyShare(createdShares[4].shareHex, 5)}
+                        className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 border border-zinc-800 rounded px-2 py-0.5"
+                      >
+                        {copiedIndex === 5 ? (
+                          <>
+                            <Check className="h-3 w-3 text-emerald-400" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="font-mono text-[10px] text-zinc-300 break-all select-all bg-zinc-900 p-2 rounded">
+                    {createdShares[4].shareHex}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-zinc-800/80">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-300">
+                    <input
+                      type="checkbox"
+                      checked={confirmedShare5}
+                      onChange={(e) => setConfirmedShare5(e.target.checked)}
+                      className="rounded border-zinc-700 bg-zinc-900 text-white focus:ring-0"
+                    />
+                    <span>I have stored Share 5 in a separate offsite storage location.</span>
+                  </label>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    disabled={!confirmedShare5}
+                    onClick={() => setDistributionStep(6)}
+                    className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-emerald-400 transition disabled:opacity-40"
+                  >
+                    <span>Complete Distribution</span>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* DISTRIBUTION 6: Complete & Test Recovery */}
+            {distributionStep === 6 && (
+              <div className="rounded-xl border border-emerald-900/60 bg-emerald-950/20 p-6 space-y-4">
+                <div className="flex items-start gap-3">
+                  <ShieldCheck className="h-6 w-6 text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-base font-bold text-white">
+                      All 5 shares separated & confirmed
+                    </h3>
+                    <p className="text-xs text-emerald-200/90 mt-1 leading-relaxed">
+                      Your vault is protected by genuine 3-of-5 Shamir Secret Sharing. No single file, person, or device holds enough shares to open your vault.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-xs text-zinc-400 space-y-2">
+                  <p className="text-white font-medium">To recover your accounts if locked out:</p>
+                  <ul className="list-disc list-inside space-y-1 text-zinc-400">
+                    <li>Option 1: Enter your master passphrase (runs Argon2id locally).</li>
+                    <li>Option 2: Gather any 3 of your 5 distributed shares (e.g. Rescue Kit Share 1 + Printed Card Share 2 + Contact Share 3).</li>
+                  </ul>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Link
+                    href="/recover"
+                    className="flex items-center gap-1.5 rounded-lg bg-white px-5 py-2.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 transition"
+                  >
+                    <span>Proceed to recovery test</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -174,17 +174,17 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs text-zinc-400">
             <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/20 p-5">
               <span className="font-mono text-zinc-500 text-sm font-semibold">01</span>
-              <h4 className="text-sm font-semibold text-white mt-2 mb-1.5">Open in incognito</h4>
+              <h4 className="text-sm font-semibold text-white mt-2 mb-1.5">Load your vault</h4>
               <p className="leading-relaxed">
-                Borrow a laptop or use a public machine. Open OmniID in an incognito window and enter your handle or upload your rescue kit.
+                On a borrowed laptop or incognito window, upload your Rescue Kit JSON (which holds your encrypted vault and Share 1) or paste the JSON text directly.
               </p>
             </div>
 
             <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/20 p-5">
               <span className="font-mono text-zinc-500 text-sm font-semibold">02</span>
-              <h4 className="text-sm font-semibold text-white mt-2 mb-1.5">Supply one secret</h4>
+              <h4 className="text-sm font-semibold text-white mt-2 mb-1.5">Supply your secret</h4>
               <p className="leading-relaxed">
-                Enter your mental passphrase to run Argon2id in WebAssembly, or paste three of your five Shamir shares if you forgot the phrase.
+                Enter your master passphrase to run Argon2id locally, or supply 2 additional separate Shamir shares from your printed card or trusted contact.
               </p>
             </div>
 
@@ -192,7 +192,7 @@ export default function HomePage() {
               <span className="font-mono text-zinc-500 text-sm font-semibold">03</span>
               <h4 className="text-sm font-semibold text-white mt-2 mb-1.5">Copy code and exit</h4>
               <p className="leading-relaxed">
-                The 6-digit TOTP code appears on the canvas. Type it into Google, then close the tab to purge memory immediately.
+                The 6-digit TOTP code appears on the canvas. Type it into Google, then close the tab or click Lock to purge session memory immediately.
               </p>
             </div>
           </div>

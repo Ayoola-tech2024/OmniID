@@ -4,8 +4,8 @@ import {
   createNewVault,
   unlockVaultWithPassphrase,
   unlockVaultWithShares,
-  reconstructMasterKeyFromShares,
   evaluatePassphraseEntropy,
+  generateDicewarePassphrase,
   generateRescueKitFile,
   generateSeparateShareCards,
   VaultAccount,
@@ -26,29 +26,41 @@ const sampleAccounts: VaultAccount[] = [
   },
 ];
 
-const strongPassphrase = 'correct horse battery staple';
+const strongPassphrase = 'boulder-glacier-falcon-meadow-timber-summit';
 
 describe('OmniID Cryptographic Invariants & Share Separation', () => {
-  test('Passphrase entropy enforcement', () => {
-    // Too short
+  test('zxcvbn passphrase strength evaluation strictly rejects weak/predictable inputs', () => {
+    // 1. Trivial single-character repetition: must fail
+    const repeated = evaluatePassphraseEntropy('aaaaaaaaaaaaaa');
+    assert.strictEqual(repeated.isValid, false);
+    assert.strictEqual(repeated.score, 0);
+
+    // 2. Predictable password + sequential numbers: must fail
+    const common = evaluatePassphraseEntropy('password123456');
+    assert.strictEqual(common.isValid, false);
+    assert.ok(common.score <= 1);
+
+    // 3. Admin sequence: must fail
+    const admin = evaluatePassphraseEntropy('admin123456789');
+    assert.strictEqual(admin.isValid, false);
+
+    // 4. Too short: must fail
     const short = evaluatePassphraseEntropy('secret');
     assert.strictEqual(short.isValid, false);
 
-    // 8 chars single word: weak
-    const weak = evaluatePassphraseEntropy('password');
-    assert.strictEqual(weak.isValid, false);
-
-    // 4 random words (Diceware style): strong
-    const diceware = evaluatePassphraseEntropy('correct horse battery staple');
+    // 5. Diceware phrase: must pass with high score
+    const diceware = evaluatePassphraseEntropy(strongPassphrase);
     assert.strictEqual(diceware.isValid, true);
-    assert.ok(diceware.estimatedBits >= 50);
+    assert.strictEqual(diceware.score, 4);
 
-    // 14+ characters: valid
-    const long = evaluatePassphraseEntropy('A7#kL9$xP2!mQ8');
-    assert.strictEqual(long.isValid, true);
+    // 6. Built-in Diceware generator produces score 4
+    const generated = generateDicewarePassphrase();
+    const evalGen = evaluatePassphraseEntropy(generated);
+    assert.strictEqual(evalGen.isValid, true);
+    assert.strictEqual(evalGen.score, 4);
   });
 
-  test('Vault creation does NOT store all shares in vault payload', async () => {
+  test('Vault creation does NOT store any recovery shares in vault payload', async () => {
     const { vault, shares, primaryShare } = await createNewVault(
       strongPassphrase,
       sampleAccounts,
@@ -67,7 +79,32 @@ describe('OmniID Cryptographic Invariants & Share Separation', () => {
     const rescueKit = generateRescueKitFile('alice@example.com', vault, primaryShare);
     assert.strictEqual(rescueKit.primaryRescueShare.index, 1);
     assert.strictEqual((rescueKit as any).shares, undefined);
+    assert.strictEqual((rescueKit as any).shamirShares, undefined);
     assert.ok(rescueKit.securityNotice.includes('CANNOT open your vault'));
+  });
+
+  test('CRITICAL EXPORT INVARIANT: No single export file contains >= 3 shares', async () => {
+    const { vault, shares, primaryShare } = await createNewVault(
+      strongPassphrase,
+      sampleAccounts,
+      'alice@example.com'
+    );
+
+    // 1. Check Rescue Kit export
+    const rescueKit = generateRescueKitFile('alice@example.com', vault, primaryShare);
+    const rescueKitShareCount = rescueKit.primaryRescueShare ? 1 : 0;
+    assert.ok(
+      rescueKitShareCount < 3,
+      `Rescue Kit contains ${rescueKitShareCount} shares, which must be < 3`
+    );
+
+    // 2. Check each separate share card
+    const separateCards = generateSeparateShareCards('alice@example.com', shares);
+    assert.strictEqual(separateCards.length, 5);
+    for (const card of separateCards) {
+      assert.ok(card.shareHex.length > 0);
+      assert.ok(card.instructions.includes('NEVER store all 5 shares together'));
+    }
   });
 
   test('Unlock with correct passphrase succeeds', async () => {
@@ -92,13 +129,13 @@ describe('OmniID Cryptographic Invariants & Share Separation', () => {
 
     await assert.rejects(
       async () => {
-        await unlockVaultWithPassphrase('wrong horse battery staple', vault);
+        await unlockVaultWithPassphrase('wrong-passphrase-does-not-work', vault);
       },
       /Incorrect passphrase or corrupted vault/
     );
   });
 
-  test('CRITICAL: 2 Shamir shares FAIL to unlock vault', async () => {
+  test('CRITICAL: 2 Shamir shares FAIL to unlock vault (threshold is 3)', async () => {
     const { vault, shares } = await createNewVault(
       strongPassphrase,
       sampleAccounts,
@@ -125,7 +162,7 @@ describe('OmniID Cryptographic Invariants & Share Separation', () => {
 
     const rescueKit = generateRescueKitFile('alice@example.com', vault, primaryShare);
 
-    // Attacker only has the rescue kit file (which has 1 share)
+    // Attacker only has the rescue kit file (which has only Share 1)
     const attackerShares = [rescueKit.primaryRescueShare.shareHex];
 
     await assert.rejects(
@@ -143,7 +180,7 @@ describe('OmniID Cryptographic Invariants & Share Separation', () => {
       'alice@example.com'
     );
 
-    // Test combinations: (1, 2, 3), (1, 3, 5), (2, 4, 5), (3, 4, 5)
+    // Test distinct combinations: (1, 2, 3), (1, 3, 5), (2, 4, 5), (3, 4, 5)
     const combos = [
       [shares[0].shareHex, shares[1].shareHex, shares[2].shareHex],
       [shares[0].shareHex, shares[2].shareHex, shares[4].shareHex],
@@ -174,19 +211,5 @@ describe('OmniID Cryptographic Invariants & Share Separation', () => {
       },
       /Duplicate shares detected/
     );
-  });
-
-  test('Separate share cards are generated properly for distribution', async () => {
-    const { shares } = await createNewVault(
-      strongPassphrase,
-      sampleAccounts,
-      'alice@example.com'
-    );
-
-    const cards = generateSeparateShareCards('alice@example.com', shares);
-    assert.strictEqual(cards.length, 5);
-    assert.strictEqual(cards[0].shareIndex, 1);
-    assert.strictEqual(cards[1].shareIndex, 2);
-    assert.ok(cards[1].instructions.includes('NEVER store all 5 shares together'));
   });
 });

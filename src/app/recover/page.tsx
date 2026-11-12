@@ -107,52 +107,65 @@ export default function RecoverPage() {
     );
   };
 
+  const [isPastingJson, setIsPastingJson] = useState(false);
+  const [pastedJson, setPastedJson] = useState('');
+
+  const parseAndLoadPayload = (jsonText: string) => {
+    try {
+      const parsed = JSON.parse(jsonText.trim());
+      const payload: EncryptedVaultPayload = parsed.encryptedVault || parsed;
+
+      if (!payload.vaultCiphertext || !payload.wrappedMasterKey) {
+        throw new Error('Missing encrypted vault data.');
+      }
+
+      setVaultPayload(payload);
+
+      // Populate ONLY Share 1
+      if (parsed.primaryRescueShare) {
+        setShare1(parsed.primaryRescueShare.shareHex);
+        setShare1Source('Rescue Kit (Share 1 of 5)');
+      } else if (parsed.shares && parsed.shares.length > 0) {
+        setShare1(parsed.shares[0].shareHex || parsed.shares[0]);
+        setShare1Source('Rescue Kit (Share 1)');
+      } else {
+        setShare1('');
+        setShare1Source(null);
+      }
+
+      setShare2('');
+      setShare3('');
+
+      if (parsed.identifier) {
+        setUsername(parsed.identifier);
+      }
+
+      setStage('auth');
+      setErrorMessage(null);
+      setInfoMessage(
+        'Rescue Kit loaded successfully. Share 1 of 5 is populated. To unlock without your passphrase, provide 2 additional separate Shamir shares from your printed card or trusted contact.'
+      );
+    } catch (err) {
+      setErrorMessage('Invalid Rescue Kit JSON: ' + String(err));
+    }
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (evt) => {
-      try {
-        const parsed = JSON.parse(evt.target?.result as string);
-        const payload: EncryptedVaultPayload = parsed.encryptedVault || parsed;
-        
-        if (!payload.vaultCiphertext || !payload.wrappedMasterKey) {
-          throw new Error('Missing encrypted vault data.');
-        }
-
-        setVaultPayload(payload);
-
-        // CRITICAL SECURITY FIX:
-        // Populate ONLY Share 1.
-        // Slots 2 and 3 MUST be entered by the user from offsite locations.
-        if (parsed.primaryRescueShare) {
-          setShare1(parsed.primaryRescueShare.shareHex);
-          setShare1Source('Rescue Kit (Share 1 of 5)');
-        } else if (parsed.shares && parsed.shares.length > 0) {
-          setShare1(parsed.shares[0].shareHex || parsed.shares[0]);
-          setShare1Source('Rescue Kit (Share 1)');
-        } else {
-          setShare1('');
-          setShare1Source(null);
-        }
-
-        setShare2('');
-        setShare3('');
-
-        if (parsed.identifier) {
-          setUsername(parsed.identifier);
-        }
-
-        setStage('auth');
-        setErrorMessage(null);
-        setInfoMessage(
-          'Rescue Kit loaded successfully. Share 1 of 5 is populated. To unlock without your passphrase, provide 2 additional separate Shamir shares from your printed card, trusted contact, or secondary backup.'
-        );
-      } catch (err) {
-        setErrorMessage('Invalid Rescue Kit JSON file: ' + String(err));
-      }
+      parseAndLoadPayload(evt.target?.result as string);
     };
     reader.readAsText(file);
+  };
+
+  const handlePastedJsonSubmit = () => {
+    if (!pastedJson.trim()) {
+      setErrorMessage('Please paste your Rescue Kit JSON text.');
+      return;
+    }
+    parseAndLoadPayload(pastedJson);
   };
 
   const handleUnlockWithPassphrase = async () => {
@@ -252,13 +265,16 @@ export default function RecoverPage() {
 
         {/* STAGE 1: Identify / Locate Vault */}
         {stage === 'identify' && (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-6">
-            <h3 className="text-sm font-semibold text-white mb-1">Locate your vault</h3>
-            <p className="text-xs text-zinc-400 mb-4">
-              Enter your handle or upload your encrypted Rescue Kit JSON file.
-            </p>
+          <div className="space-y-5">
+            {/* Option A: Local Cache Lookup */}
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
+              <h3 className="text-sm font-semibold text-white mb-1">
+                Option A: Local Device Cache
+              </h3>
+              <p className="text-xs text-zinc-400 mb-3">
+                If you are on the computer where you originally enrolled, enter your identifier to find your locally cached vault.
+              </p>
 
-            <div className="space-y-4">
               <div>
                 <label className="block text-xs text-zinc-400 mb-1">
                   Identifier
@@ -280,27 +296,57 @@ export default function RecoverPage() {
                   </button>
                 </div>
               </div>
+            </div>
 
-              <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-zinc-800" />
-                <span className="flex-shrink mx-3 text-[11px] text-zinc-500 font-mono">
-                  OR
-                </span>
-                <div className="flex-grow border-t border-zinc-800" />
+            {/* Option B: Borrowed Laptop / Untrusted Machine */}
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-sm font-semibold text-white">
+                  Option B: Borrowed Machine / Incognito
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsPastingJson(!isPastingJson)}
+                  className="text-xs text-zinc-400 hover:text-white underline"
+                >
+                  {isPastingJson ? 'Upload file instead' : 'Or paste JSON text'}
+                </button>
               </div>
+              <p className="text-xs text-zinc-400 mb-4">
+                Because OmniID is serverless, borrowed machines require your Rescue Kit (which contains your encrypted vault + Share 1).
+              </p>
 
-              <div>
-                <label className="flex flex-col items-center justify-center rounded-lg border border-dashed border-zinc-800 bg-zinc-900/40 p-4 cursor-pointer hover:border-zinc-700 transition">
-                  <Upload className="h-5 w-5 text-zinc-400 mb-1" />
-                  <span className="text-xs font-medium text-zinc-300">
-                    Upload Rescue Kit JSON
-                  </span>
-                  <span className="text-[10px] text-zinc-500 mt-0.5">
-                    For incognito tabs or borrowed laptops (contains ciphertext + Share 1)
-                  </span>
-                  <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
-                </label>
-              </div>
+              {!isPastingJson ? (
+                <div>
+                  <label className="flex flex-col items-center justify-center rounded-lg border border-dashed border-zinc-800 bg-zinc-900/40 p-4 cursor-pointer hover:border-zinc-700 transition">
+                    <Upload className="h-5 w-5 text-zinc-400 mb-1" />
+                    <span className="text-xs font-medium text-zinc-300">
+                      Upload Rescue Kit JSON File
+                    </span>
+                    <span className="text-[10px] text-zinc-500 mt-0.5">
+                      omni-id-rescue-kit.json (contains ciphertext + Share 1)
+                    </span>
+                    <input type="file" accept=".json" onChange={handleFileUpload} className="hidden" />
+                  </label>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <textarea
+                    rows={4}
+                    value={pastedJson}
+                    onChange={(e) => setPastedJson(e.target.value)}
+                    placeholder='Paste the contents of your omni-id-rescue-kit.json here...'
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 text-xs font-mono text-zinc-300 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handlePastedJsonSubmit}
+                    className="rounded-lg bg-white px-4 py-1.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 transition"
+                  >
+                    Load Pasted JSON
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

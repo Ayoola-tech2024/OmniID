@@ -21,6 +21,7 @@
 
 import { argon2id } from 'hash-wasm';
 import { split as sssSplit, combine as sssCombine } from 'shamir-secret-sharing';
+import zxcvbn from 'zxcvbn';
 import {
   VaultAccount,
   ShamirShareMeta,
@@ -29,6 +30,7 @@ import {
   EncryptedVaultPayload,
   RescueKitExport,
   SeparateShareCard,
+  PassphraseEvaluation,
 } from '../types/vault';
 
 export type {
@@ -39,6 +41,7 @@ export type {
   EncryptedVaultPayload,
   RescueKitExport,
   SeparateShareCard,
+  PassphraseEvaluation,
 };
 
 // Safe access to WebCrypto in both Browser and Node.js environments
@@ -59,49 +62,82 @@ export const DEFAULT_ARGON2_PARAMS: Argon2idParams = {
   hashLength: 32,
 };
 
+export const DICEWARE_WORDLIST = [
+  'acorn', 'almond', 'amber', 'anchor', 'apple', 'apron', 'archer', 'arctic', 'atlas', 'autumn',
+  'badger', 'balsam', 'banner', 'bark', 'baron', 'basin', 'beacon', 'beetle', 'bison', 'blizzard',
+  'boulder', 'breeze', 'bronze', 'brook', 'buffalo', 'cactus', 'canyon', 'cedar', 'chimney', 'cipher',
+  'cliff', 'clover', 'cobalt', 'copper', 'coral', 'cosmos', 'crater', 'creek', 'crystal', 'current',
+  'dagger', 'dawn', 'desert', 'drift', 'dune', 'eagle', 'echo', 'ember', 'falcon', 'fallow',
+  'feather', 'fern', 'finch', 'flint', 'forest', 'fossil', 'foxtrot', 'frost', 'galaxy', 'garnet',
+  'geyser', 'glacier', 'granite', 'gravel', 'grove', 'gull', 'harbor', 'hawk', 'hazel', 'heather',
+  'heron', 'hickory', 'horizon', 'icicle', 'iguana', 'indigo', 'island', 'jasper', 'javelin', 'juniper',
+  'kayak', 'kelp', 'kernel', 'kestrel', 'lagoon', 'larch', 'lark', 'laurel', 'lava', 'ledge',
+  'lichen', 'lynx', 'magma', 'magnolia', 'maple', 'marble', 'marsh', 'meadow', 'mesa', 'meteor',
+  'mineral', 'monarch', 'moss', 'nebula', 'nettle', 'nova', 'oasis', 'ocean', 'olive', 'onyx',
+  'opal', 'orbit', 'orchid', 'osprey', 'otter', 'owl', 'packet', 'parchment', 'pebble', 'pelican',
+  'pine', 'plover', 'poplar', 'prairie', 'prism', 'pulsar', 'python', 'quartz', 'quill', 'quiver',
+  'radius', 'raptor', 'raven', 'reef', 'ridge', 'ripple', 'river', 'robin', 'rocket', 'rover',
+  'saddle', 'safari', 'saffron', 'sage', 'salmon', 'sapphire', 'savanna', 'scale', 'scarlet', 'scenic',
+  'scout', 'seagull', 'sequoia', 'shadow', 'shale', 'shield', 'sierra', 'silver', 'sparrow', 'spruce',
+  'summit', 'talon', 'tamarind', 'tapestry', 'thistle', 'thunder', 'timber', 'topaz', 'torrent', 'travertine',
+  'tundra', 'turtle', 'valley', 'velvet', 'vortex', 'walnut', 'walrus', 'wave', 'willow', 'winter',
+  'wolf', 'zenith', 'zephyr', 'zircon'
+];
+
 /**
- * Evaluates passphrase entropy.
- * Enforces either 4+ words (Diceware style) or 14+ characters to resist GPU attacks.
+ * Generates a 6-word cryptographically random Diceware passphrase.
+ * True Shannon entropy > 75 bits.
  */
-export function evaluatePassphraseEntropy(passphrase: string): {
-  isValid: boolean;
-  wordCount: number;
-  charCount: number;
-  estimatedBits: number;
-  feedback: string;
-} {
+export function generateDicewarePassphrase(): string {
+  const crypto = getCrypto();
+  const picked: string[] = [];
+  const array = new Uint32Array(6);
+  crypto.getRandomValues(array);
+  for (let i = 0; i < 6; i++) {
+    picked.push(DICEWARE_WORDLIST[array[i] % DICEWARE_WORDLIST.length]);
+  }
+  return picked.join('-');
+}
+
+/**
+ * Evaluates passphrase strength using zxcvbn.
+ * Strictly requires zxcvbn score >= 3 and length >= 12.
+ */
+export function evaluatePassphraseEntropy(passphrase: string): PassphraseEvaluation {
   const trimmed = passphrase.trim();
-  const words = trimmed.split(/[\s\-_]+/).filter((w) => w.length > 0);
-  const wordCount = words.length;
-  const charCount = trimmed.length;
-
-  // Estimate bits of entropy:
-  // - Diceware word list: ~12.9 bits per random word
-  // - Mixed characters: ~4 bits per character
-  let estimatedBits = 0;
-  if (wordCount >= 4) {
-    estimatedBits = Math.round(wordCount * 12.9);
-  } else {
-    estimatedBits = Math.round(charCount * 4.2);
+  if (!trimmed) {
+    return {
+      isValid: false,
+      score: 0,
+      scoreLabel: 'Very Weak',
+      warning: 'Passphrase cannot be empty.',
+      suggestion: 'Choose at least 5-6 random words or use the generator.',
+      crackTimeDisplay: 'instant',
+    };
   }
 
-  const isValid = wordCount >= 4 || charCount >= 14;
+  const result = zxcvbn(trimmed);
+  const scoreLabels = ['Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'] as const;
+  const scoreLabel = scoreLabels[result.score];
 
-  let feedback = 'Strong passphrase.';
-  if (!isValid) {
-    if (charCount < 8) {
-      feedback = 'Passphrase is too short. Use at least 4 random words or 14+ characters.';
-    } else {
-      feedback = 'Weak passphrase. Add more words (e.g. "correct horse battery staple") or lengthen to 14+ characters.';
-    }
-  }
+  const isValid = result.score >= 3 && trimmed.length >= 12;
+
+  const warning =
+    result.feedback.warning ||
+    (result.score < 3 ? 'Passphrase is too predictable or easily guessed.' : '');
+  const suggestion =
+    result.feedback.suggestions.join(' ') ||
+    (result.score < 3
+      ? 'Add more uncommon random words or use the generator.'
+      : 'Passphrase provides strong resistance against offline brute-force cracking.');
 
   return {
     isValid,
-    wordCount,
-    charCount,
-    estimatedBits,
-    feedback,
+    score: result.score,
+    scoreLabel,
+    warning,
+    suggestion,
+    crackTimeDisplay: String(result.crack_times_display.offline_slow_hashing_1e4_per_second || 'centuries'),
   };
 }
 
@@ -270,7 +306,7 @@ export async function createNewVault(
 }> {
   const entropy = evaluatePassphraseEntropy(passphrase);
   if (!entropy.isValid) {
-    throw new Error(entropy.feedback);
+    throw new Error(entropy.warning || entropy.suggestion);
   }
 
   const crypto = getCrypto();

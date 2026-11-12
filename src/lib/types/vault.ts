@@ -71,3 +71,12 @@ export interface SeparateShareCard {
   shareHex: string;
   instructions: string;
 }
+
+export interface PassphraseEvaluation {
+  isValid: boolean;
+  score: number; // 0 to 4 from zxcvbn
+  scoreLabel: 'Very Weak' | 'Weak' | 'Fair' | 'Strong' | 'Very Strong';
+  warning: string;
+  suggestion: string;
+  crackTimeDisplay: string;
+}
