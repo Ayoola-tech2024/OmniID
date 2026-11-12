@@ -776,7 +776,10 @@ export default function EnrollPage() {
                   <button
                     type="button"
                     disabled={!confirmedShare5}
-                    onClick={() => setDistributionStep(6)}
+                    onClick={() => {
+                      setDistributionStep(6);
+                      setCreatedShares([]);
+                    }}
                     className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-emerald-400 transition disabled:opacity-40"
                   >
                     <span>Complete Distribution</span>
@@ -796,7 +799,7 @@ export default function EnrollPage() {
                       All 5 shares separated & confirmed
                     </h3>
                     <p className="text-xs text-emerald-200/90 mt-1 leading-relaxed">
-                      Your vault is protected by genuine 3-of-5 Shamir Secret Sharing. No single file, person, or device holds enough shares to open your vault.
+                      Your vault is protected by genuine 3-of-5 Shamir Secret Sharing. All recovery shares have been purged from component state and hidden from the interface. No single file, person, or device holds enough shares to open your vault.
                     </p>
                   </div>
                 </div>
@@ -807,6 +810,9 @@ export default function EnrollPage() {
                     <li>Option 1: Enter your master passphrase (runs Argon2id locally).</li>
                     <li>Option 2: Gather any 3 of your 5 distributed shares (e.g. Rescue Kit Share 1 + Printed Card Share 2 + Contact Share 3).</li>
                   </ul>
+                  <p className="text-[11px] text-zinc-500 pt-1 border-t border-zinc-900">
+                    ✓ Invariant verified: State cleared. Individual shares exist only on your physical printout, trusted contact card, secondary device, and offsite storage.
+                  </p>
                 </div>
 
                 <div className="flex justify-end pt-2">

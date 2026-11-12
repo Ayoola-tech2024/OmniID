@@ -62,46 +62,50 @@ export const DEFAULT_ARGON2_PARAMS: Argon2idParams = {
   hashLength: 32,
 };
 
-export const DICEWARE_WORDLIST = [
-  'acorn', 'almond', 'amber', 'anchor', 'apple', 'apron', 'archer', 'arctic', 'atlas', 'autumn',
-  'badger', 'balsam', 'banner', 'bark', 'baron', 'basin', 'beacon', 'beetle', 'bison', 'blizzard',
-  'boulder', 'breeze', 'bronze', 'brook', 'buffalo', 'cactus', 'canyon', 'cedar', 'chimney', 'cipher',
-  'cliff', 'clover', 'cobalt', 'copper', 'coral', 'cosmos', 'crater', 'creek', 'crystal', 'current',
-  'dagger', 'dawn', 'desert', 'drift', 'dune', 'eagle', 'echo', 'ember', 'falcon', 'fallow',
-  'feather', 'fern', 'finch', 'flint', 'forest', 'fossil', 'foxtrot', 'frost', 'galaxy', 'garnet',
-  'geyser', 'glacier', 'granite', 'gravel', 'grove', 'gull', 'harbor', 'hawk', 'hazel', 'heather',
-  'heron', 'hickory', 'horizon', 'icicle', 'iguana', 'indigo', 'island', 'jasper', 'javelin', 'juniper',
-  'kayak', 'kelp', 'kernel', 'kestrel', 'lagoon', 'larch', 'lark', 'laurel', 'lava', 'ledge',
-  'lichen', 'lynx', 'magma', 'magnolia', 'maple', 'marble', 'marsh', 'meadow', 'mesa', 'meteor',
-  'mineral', 'monarch', 'moss', 'nebula', 'nettle', 'nova', 'oasis', 'ocean', 'olive', 'onyx',
-  'opal', 'orbit', 'orchid', 'osprey', 'otter', 'owl', 'packet', 'parchment', 'pebble', 'pelican',
-  'pine', 'plover', 'poplar', 'prairie', 'prism', 'pulsar', 'python', 'quartz', 'quill', 'quiver',
-  'radius', 'raptor', 'raven', 'reef', 'ridge', 'ripple', 'river', 'robin', 'rocket', 'rover',
-  'saddle', 'safari', 'saffron', 'sage', 'salmon', 'sapphire', 'savanna', 'scale', 'scarlet', 'scenic',
-  'scout', 'seagull', 'sequoia', 'shadow', 'shale', 'shield', 'sierra', 'silver', 'sparrow', 'spruce',
-  'summit', 'talon', 'tamarind', 'tapestry', 'thistle', 'thunder', 'timber', 'topaz', 'torrent', 'travertine',
-  'tundra', 'turtle', 'valley', 'velvet', 'vortex', 'walnut', 'walrus', 'wave', 'willow', 'winter',
-  'wolf', 'zenith', 'zephyr', 'zircon'
-];
+import { EFF_LARGE_WORDLIST } from './effWordlist';
+
+export { EFF_LARGE_WORDLIST };
 
 /**
- * Generates a 6-word cryptographically random Diceware passphrase.
- * True Shannon entropy > 75 bits.
+ * Unbiased random word selector using rejection sampling on the official EFF Large Wordlist (7,776 words).
+ * 
+ * Rejection sampling math:
+ * 16-bit range = 65,536 values (0..65535).
+ * 65536 / 7776 = 8.428...
+ * 8 * 7776 = 62,208.
+ * Sampling values < 62,208 guarantees exactly 8 equiprobable outcomes per word (0 modulo bias).
+ * Values >= 62,208 (~5% chance) are discarded and resampled.
  */
-export function generateDicewarePassphrase(): string {
+export function getCryptoRandomEffWord(): string {
   const crypto = getCrypto();
+  const buffer = new Uint16Array(1);
+  const limit = 62208; // 8 * 7776
+  while (true) {
+    crypto.getRandomValues(buffer);
+    const val = buffer[0];
+    if (val < limit) {
+      return EFF_LARGE_WORDLIST[val % 7776];
+    }
+  }
+}
+
+/**
+ * Generates a 6-word cryptographically random Diceware passphrase using the official EFF Large Wordlist.
+ * 
+ * True Shannon entropy:
+ * 6 * log2(7776) = 77.55 bits of true cryptographic entropy.
+ */
+export function generateDicewarePassphrase(wordCount: number = 6): string {
   const picked: string[] = [];
-  const array = new Uint32Array(6);
-  crypto.getRandomValues(array);
-  for (let i = 0; i < 6; i++) {
-    picked.push(DICEWARE_WORDLIST[array[i] % DICEWARE_WORDLIST.length]);
+  for (let i = 0; i < wordCount; i++) {
+    picked.push(getCryptoRandomEffWord());
   }
   return picked.join('-');
 }
 
 /**
  * Evaluates passphrase strength using zxcvbn.
- * Strictly requires zxcvbn score >= 3 and length >= 12.
+ * Strictly requires zxcvbn score 4 (Very Strong) and length >= 14.
  */
 export function evaluatePassphraseEntropy(passphrase: string): PassphraseEvaluation {
   const trimmed = passphrase.trim();
@@ -111,7 +115,7 @@ export function evaluatePassphraseEntropy(passphrase: string): PassphraseEvaluat
       score: 0,
       scoreLabel: 'Very Weak',
       warning: 'Passphrase cannot be empty.',
-      suggestion: 'Choose at least 5-6 random words or use the generator.',
+      suggestion: 'Choose at least 6 random Diceware words or use the generator.',
       crackTimeDisplay: 'instant',
     };
   }
@@ -120,16 +124,17 @@ export function evaluatePassphraseEntropy(passphrase: string): PassphraseEvaluat
   const scoreLabels = ['Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'] as const;
   const scoreLabel = scoreLabels[result.score];
 
-  const isValid = result.score >= 3 && trimmed.length >= 12;
+  // Strictly enforce score 4 for vault master key derivation
+  const isValid = result.score >= 4 && trimmed.length >= 14;
 
   const warning =
     result.feedback.warning ||
-    (result.score < 3 ? 'Passphrase is too predictable or easily guessed.' : '');
+    (result.score < 4 ? 'Passphrase does not meet maximum security requirements (Score 4 required).' : '');
   const suggestion =
     result.feedback.suggestions.join(' ') ||
-    (result.score < 3
-      ? 'Add more uncommon random words or use the generator.'
-      : 'Passphrase provides strong resistance against offline brute-force cracking.');
+    (result.score < 4
+      ? 'Use 6 random Diceware words (click Generate) or create an exceptionally long, unpredictable phrase.'
+      : 'Passphrase provides maximum resistance against offline brute-force cracking (Score 4 - Very Strong).');
 
   return {
     isValid,
@@ -494,6 +499,12 @@ export function bufferToHex(buf: Uint8Array): string {
 
 export function hexToBuffer(hex: string): Uint8Array {
   const clean = hex.replace(/[^0-9a-fA-F]/g, '');
+  if (clean.length === 0) {
+    throw new Error('Invalid hex string: empty hex data');
+  }
+  if (clean.length % 2 !== 0) {
+    throw new Error('Invalid hex string: length must be an even number of characters');
+  }
   const bytes = new Uint8Array(clean.length / 2);
   for (let i = 0; i < bytes.length; i++) {
     bytes[i] = parseInt(clean.substring(i * 2, i * 2 + 2), 16);

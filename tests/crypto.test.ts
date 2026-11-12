@@ -8,6 +8,8 @@ import {
   generateDicewarePassphrase,
   generateRescueKitFile,
   generateSeparateShareCards,
+  hexToBuffer,
+  EFF_LARGE_WORDLIST,
   VaultAccount,
 } from '../src/lib/crypto/vaultCrypto';
 
@@ -26,10 +28,19 @@ const sampleAccounts: VaultAccount[] = [
   },
 ];
 
-const strongPassphrase = 'boulder-glacier-falcon-meadow-timber-summit';
+const strongPassphrase = 'curtain-smuggler-whacky-manor-kerosene-footsore';
 
 describe('OmniID Cryptographic Invariants & Share Separation', () => {
-  test('zxcvbn passphrase strength evaluation strictly rejects weak/predictable inputs', () => {
+  test('EFF Large Wordlist has exactly 7,776 words providing 77.55 bits per 6 words', () => {
+    assert.strictEqual(EFF_LARGE_WORDLIST.length, 7776);
+    // Each word provides log2(7776) = 12.9248 bits
+    const bitsPerWord = Math.log2(EFF_LARGE_WORDLIST.length);
+    assert.ok(bitsPerWord > 12.92);
+    const sixWordEntropy = bitsPerWord * 6;
+    assert.ok(sixWordEntropy > 77.5);
+  });
+
+  test('zxcvbn passphrase strength evaluation strictly requires score 4 (Very Strong)', () => {
     // 1. Trivial single-character repetition: must fail
     const repeated = evaluatePassphraseEntropy('aaaaaaaaaaaaaa');
     assert.strictEqual(repeated.isValid, false);
@@ -48,16 +59,47 @@ describe('OmniID Cryptographic Invariants & Share Separation', () => {
     const short = evaluatePassphraseEntropy('secret');
     assert.strictEqual(short.isValid, false);
 
-    // 5. Diceware phrase: must pass with high score
+    // 5. Fair/medium strength (score 3) is rejected by score 4 policy
+    const fair = evaluatePassphraseEntropy('p@$$w0rd123456!');
+    assert.strictEqual(fair.score, 3);
+    assert.strictEqual(fair.isValid, false); // Strict policy requires score 4
+
+    // 6. 6-word EFF Diceware phrase: must pass with score 4
     const diceware = evaluatePassphraseEntropy(strongPassphrase);
     assert.strictEqual(diceware.isValid, true);
     assert.strictEqual(diceware.score, 4);
 
-    // 6. Built-in Diceware generator produces score 4
+    // 7. Built-in Diceware generator produces score 4
     const generated = generateDicewarePassphrase();
     const evalGen = evaluatePassphraseEntropy(generated);
     assert.strictEqual(evalGen.isValid, true);
     assert.strictEqual(evalGen.score, 4);
+  });
+
+  test('hexToBuffer strictly validates input length and rejects odd-length or empty strings', () => {
+    // Odd-length input must throw clean error, NOT RangeError: Invalid typed array length
+    assert.throws(
+      () => {
+        hexToBuffer('abc');
+      },
+      /length must be an even number of characters/
+    );
+
+    // Empty input must throw clean error
+    assert.throws(
+      () => {
+        hexToBuffer('');
+      },
+      /empty hex data/
+    );
+
+    // Valid hex must succeed
+    const valid = hexToBuffer('deadbeef');
+    assert.strictEqual(valid.length, 4);
+    assert.strictEqual(valid[0], 0xde);
+    assert.strictEqual(valid[1], 0xad);
+    assert.strictEqual(valid[2], 0xbe);
+    assert.strictEqual(valid[3], 0xef);
   });
 
   test('Vault creation does NOT store any recovery shares in vault payload', async () => {
@@ -83,27 +125,50 @@ describe('OmniID Cryptographic Invariants & Share Separation', () => {
     assert.ok(rescueKit.securityNotice.includes('CANNOT open your vault'));
   });
 
-  test('CRITICAL EXPORT INVARIANT: No single export file contains >= 3 shares', async () => {
+  test('CRITICAL EXPORT INVARIANT: No single export file contains >= 3 shares (non-tautological serialized inspection)', async () => {
     const { vault, shares, primaryShare } = await createNewVault(
       strongPassphrase,
       sampleAccounts,
       'alice@example.com'
     );
 
-    // 1. Check Rescue Kit export
+    // 1. Check serialized Rescue Kit JSON: must NOT contain shares 2-5 anywhere in content
     const rescueKit = generateRescueKitFile('alice@example.com', vault, primaryShare);
-    const rescueKitShareCount = rescueKit.primaryRescueShare ? 1 : 0;
-    assert.ok(
-      rescueKitShareCount < 3,
-      `Rescue Kit contains ${rescueKitShareCount} shares, which must be < 3`
-    );
+    const rescueKitJson = JSON.stringify(rescueKit).toLowerCase();
+    for (const s of shares.slice(1)) {
+      assert.ok(
+        !rescueKitJson.includes(s.shareHex.toLowerCase()),
+        `Rescue kit leaked share ${s.index} in serialized JSON`
+      );
+    }
+    // Verify Share 1 is indeed the sole share present
+    assert.ok(rescueKitJson.includes(shares[0].shareHex.toLowerCase()));
 
-    // 2. Check each separate share card
+    // 2. Check each separate share card: each card i must NOT leak any share j !== i
     const separateCards = generateSeparateShareCards('alice@example.com', shares);
     assert.strictEqual(separateCards.length, 5);
     for (const card of separateCards) {
-      assert.ok(card.shareHex.length > 0);
-      assert.ok(card.instructions.includes('NEVER store all 5 shares together'));
+      const cardJson = JSON.stringify(card).toLowerCase();
+      // It must contain its own share
+      assert.ok(cardJson.includes(card.shareHex.toLowerCase()));
+      // It must NOT contain any other share
+      for (const s of shares) {
+        if (s.index !== card.shareIndex) {
+          assert.ok(
+            !cardJson.includes(s.shareHex.toLowerCase()),
+            `Card ${card.shareIndex} leaked share ${s.index}`
+          );
+        }
+      }
+    }
+
+    // 3. Check encrypted vault ciphertext payload: contains zero shares
+    const vaultJson = JSON.stringify(vault).toLowerCase();
+    for (const s of shares) {
+      assert.ok(
+        !vaultJson.includes(s.shareHex.toLowerCase()),
+        `Vault payload leaked share ${s.index}`
+      );
     }
   });
 
