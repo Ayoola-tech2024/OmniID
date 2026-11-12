@@ -13,7 +13,7 @@ interface CanvasVaultProps {
 export default function CanvasVaultDisplay({ accounts, onLock }: CanvasVaultProps) {
   const [totpList, setTotpList] = useState<LiveTotpCode[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [sessionSeconds, setSessionSeconds] = useState(45);
+  const [sessionSeconds, setSessionSeconds] = useState(60);
   const canvasRefs = useRef<{ [key: string]: HTMLCanvasElement | null }>({});
 
   // Real-time TOTP generation loop
@@ -55,7 +55,7 @@ export default function CanvasVaultDisplay({ accounts, onLock }: CanvasVaultProp
     return () => clearInterval(interval);
   }, [accounts]);
 
-  // Ephemeral countdown timer (auto-lock after 45 seconds)
+  // Ephemeral countdown timer (auto-lock after 60 seconds)
   useEffect(() => {
     const timer = setInterval(() => {
       setSessionSeconds((prev) => {
@@ -86,7 +86,7 @@ export default function CanvasVaultDisplay({ accounts, onLock }: CanvasVaultProp
             <h3 className="text-sm font-semibold text-white">Emergency Authenticator Vault</h3>
           </div>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Codes render to an isolated canvas. Memory clears when closed.
+            Codes render to an isolated canvas with sub-pixel jitter. Volatile memory is wiped on lock or timeout.
           </p>
         </div>
 
@@ -98,7 +98,7 @@ export default function CanvasVaultDisplay({ accounts, onLock }: CanvasVaultProp
           <button
             onClick={onLock}
             className="flex items-center gap-1 rounded border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition"
-            title="Wipe memory immediately"
+            title="Lock vault and clear session"
           >
             <X className="h-3.5 w-3.5" />
             <span>Lock</span>

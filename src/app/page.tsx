@@ -148,7 +148,7 @@ export default function HomePage() {
                 <h4 className="text-sm font-semibold text-white">3. Isolated Canvas Display</h4>
                 <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
                   Decrypted codes render directly to an HTML5 canvas element with sub-pixel jitter instead of text nodes in the DOM. 
-                  Browser extensions cannot read them, and volatile memory clears after 45 seconds.
+                  Browser extensions cannot read them, and volatile memory clears on lock or after 60 seconds.
                 </p>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-800/60 text-[11px] text-zinc-500 font-mono">

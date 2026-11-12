@@ -5,7 +5,7 @@
  * without persisting keys or secret tokens.
  */
 import * as OTPAuth from 'otpauth';
-import { VaultAccount } from '../crypto/fuzzyVault';
+import { VaultAccount } from '../types/vault';
 
 export interface LiveTotpCode {
   accountId: string;

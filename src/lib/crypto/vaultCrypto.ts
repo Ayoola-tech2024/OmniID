@@ -1,64 +1,55 @@
 /**
- * OmniID Cryptographic Engine (Production Grade)
+ * OmniID Cryptographic Engine
  * 
- * Cryptographic Architecture:
+ * Security Architecture:
  * 1. Master Vault Key (256-bit random entropy, generated via WebCrypto).
  * 2. Primary Encryption: AES-256-GCM authenticated encryption for TOTP seeds and backup codes.
  * 3. Primary Key Protection: High-entropy Passphrase -> Argon2id (m=64MiB, t=3, p=1, 16-byte salt) -> AES-256-GCM key wrapping.
  * 4. Disaster Recovery (Hardware-Independent Lifeline):
  *    Shamir's Secret Sharing (3-of-5 threshold):
- *    Master Vault Key is split into 5 shares:
- *      - Share 1: Primary Device / Local
- *      - Share 2: Printed Emergency Rescue Card / QR
- *      - Share 3: Trusted Contact / Co-founder
- *      - Share 4: Cloud Backup (Encrypted)
- *      - Share 5: Server Escrow (Time-locked recovery)
+ *    Master Vault Key is split into 5 distinct shares:
+ *      - Share 1: Local / Primary Rescue Share (saved with Rescue Kit)
+ *      - Share 2: Emergency Printed Card (paper / fireproof box)
+ *      - Share 3: Trusted Contact (partner / co-founder / attorney)
+ *      - Share 4: Secondary Hardware / Air-Gapped USB
+ *      - Share 5: Encrypted Cloud Storage / Safety Box
  *    Any 3 shares mathematically reconstruct the Master Vault Key.
- * 5. Memory Security: zeroizeBuffer() wipes volatile RAM on lock/self-destruct.
- * 
- * Note: Biometrics are strictly excluded from master key derivation.
+ * 5. Share Separation Guarantee:
+ *    The encrypted vault payload and Rescue Kit contain AT MOST Share 1.
+ *    Shares 2-5 are exported separately and must never be stored in the same file or database.
  */
 
 import { argon2id } from 'hash-wasm';
 import { split as sssSplit, combine as sssCombine } from 'shamir-secret-sharing';
+import {
+  VaultAccount,
+  ShamirShareMeta,
+  Argon2idParams,
+  EncryptedMasterKeyContainer,
+  EncryptedVaultPayload,
+  RescueKitExport,
+  SeparateShareCard,
+} from '../types/vault';
 
-export interface VaultAccount {
-  id: string;
-  service: string; // e.g. "Google", "GitHub", "AWS", "Resend"
-  accountName: string; // e.g. "user@example.com"
-  secret: string; // Base32 TOTP secret key
-  digits?: number;
-  period?: number;
-}
+export type {
+  VaultAccount,
+  ShamirShareMeta,
+  Argon2idParams,
+  EncryptedMasterKeyContainer,
+  EncryptedVaultPayload,
+  RescueKitExport,
+  SeparateShareCard,
+};
 
-export interface ShamirShareMeta {
-  index: number;
-  label: string;
-  shareHex: string;
-  description: string;
-}
-
-export interface Argon2idParams {
-  memorySize: number; // in KB, e.g. 65536 = 64MB
-  iterations: number; // e.g. 3
-  parallelism: number; // e.g. 1
-  hashLength: number; // 32 bytes = 256 bits
-}
-
-export interface EncryptedMasterKeyContainer {
-  salt: string; // Base64
-  iv: string; // Base64
-  ciphertext: string; // Base64 wrapped master key
-  kdfParams: Argon2idParams;
-}
-
-export interface EncryptedVaultPayload {
-  version: string; // "3.0.0"
-  vaultIv: string; // Base64
-  vaultCiphertext: string; // Base64 encrypted VaultAccount[]
-  wrappedMasterKey: EncryptedMasterKeyContainer;
-  shamirShares: ShamirShareMeta[]; // Exportable 3-of-5 recovery shares
-  createdAt: string;
+// Safe access to WebCrypto in both Browser and Node.js environments
+function getCrypto(): Crypto {
+  if (typeof window !== 'undefined' && window.crypto) {
+    return window.crypto;
+  }
+  if (typeof globalThis !== 'undefined' && globalThis.crypto) {
+    return globalThis.crypto;
+  }
+  throw new Error('WebCrypto API is not available in the current environment.');
 }
 
 export const DEFAULT_ARGON2_PARAMS: Argon2idParams = {
@@ -67,6 +58,52 @@ export const DEFAULT_ARGON2_PARAMS: Argon2idParams = {
   parallelism: 1,
   hashLength: 32,
 };
+
+/**
+ * Evaluates passphrase entropy.
+ * Enforces either 4+ words (Diceware style) or 14+ characters to resist GPU attacks.
+ */
+export function evaluatePassphraseEntropy(passphrase: string): {
+  isValid: boolean;
+  wordCount: number;
+  charCount: number;
+  estimatedBits: number;
+  feedback: string;
+} {
+  const trimmed = passphrase.trim();
+  const words = trimmed.split(/[\s\-_]+/).filter((w) => w.length > 0);
+  const wordCount = words.length;
+  const charCount = trimmed.length;
+
+  // Estimate bits of entropy:
+  // - Diceware word list: ~12.9 bits per random word
+  // - Mixed characters: ~4 bits per character
+  let estimatedBits = 0;
+  if (wordCount >= 4) {
+    estimatedBits = Math.round(wordCount * 12.9);
+  } else {
+    estimatedBits = Math.round(charCount * 4.2);
+  }
+
+  const isValid = wordCount >= 4 || charCount >= 14;
+
+  let feedback = 'Strong passphrase.';
+  if (!isValid) {
+    if (charCount < 8) {
+      feedback = 'Passphrase is too short. Use at least 4 random words or 14+ characters.';
+    } else {
+      feedback = 'Weak passphrase. Add more words (e.g. "correct horse battery staple") or lengthen to 14+ characters.';
+    }
+  }
+
+  return {
+    isValid,
+    wordCount,
+    charCount,
+    estimatedBits,
+    feedback,
+  };
+}
 
 /**
  * Derives a 256-bit encryption key from a user passphrase using Argon2id (WebAssembly).
@@ -95,10 +132,11 @@ export async function encryptAesGcm(
   keyBytes: Uint8Array,
   plaintext: Uint8Array
 ): Promise<{ iv: Uint8Array; ciphertext: Uint8Array }> {
+  const crypto = getCrypto();
   const iv = new Uint8Array(12);
-  window.crypto.getRandomValues(iv);
+  crypto.getRandomValues(iv);
 
-  const cryptoKey = await window.crypto.subtle.importKey(
+  const cryptoKey = await crypto.subtle.importKey(
     'raw',
     keyBytes as unknown as BufferSource,
     { name: 'AES-GCM' },
@@ -106,7 +144,7 @@ export async function encryptAesGcm(
     ['encrypt']
   );
 
-  const encryptedBuffer = await window.crypto.subtle.encrypt(
+  const encryptedBuffer = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: iv as unknown as BufferSource },
     cryptoKey,
     plaintext as unknown as BufferSource
@@ -126,7 +164,8 @@ export async function decryptAesGcm(
   iv: Uint8Array,
   ciphertext: Uint8Array
 ): Promise<Uint8Array> {
-  const cryptoKey = await window.crypto.subtle.importKey(
+  const crypto = getCrypto();
+  const cryptoKey = await crypto.subtle.importKey(
     'raw',
     keyBytes as unknown as BufferSource,
     { name: 'AES-GCM' },
@@ -134,7 +173,7 @@ export async function decryptAesGcm(
     ['decrypt']
   );
 
-  const decryptedBuffer = await window.crypto.subtle.decrypt(
+  const decryptedBuffer = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: iv as unknown as BufferSource },
     cryptoKey,
     ciphertext as unknown as BufferSource
@@ -144,18 +183,33 @@ export async function decryptAesGcm(
 }
 
 /**
- * Generates 3-of-5 Shamir Secret Sharing shares for a 256-bit key.
+ * Generates 3-of-5 Shamir Secret Sharing shares for a 256-bit master key.
  */
 export async function createShamirRecoveryShares(masterKey: Uint8Array): Promise<ShamirShareMeta[]> {
   // sssSplit takes (secret: Uint8Array, shares: number, threshold: number)
   const rawShares = await sssSplit(masterKey, 5, 3);
-  
+
   const labels = [
-    { label: 'Primary Device Share', desc: 'Saved in primary browser/device secure storage' },
-    { label: 'Emergency Printed Card', desc: 'Print or write in your physical fireproof vault / notebook' },
-    { label: 'Trusted Contact Share', desc: 'Give to your spouse, trusted co-founder, or legal contact' },
-    { label: 'Secondary Hardware / Offline Backup', desc: 'Stored on an air-gapped USB or secondary laptop' },
-    { label: 'Time-Locked Escrow Share', desc: 'Held in escrow with 48h emergency cancellation delay' },
+    {
+      label: 'Share 1: Primary Device / Local Rescue',
+      desc: 'Stored with your Rescue Kit file. By itself, this share CANNOT decrypt your vault.',
+    },
+    {
+      label: 'Share 2: Emergency Printed Paper Card',
+      desc: 'Print or write in physical notebook, emergency folder, or home safe.',
+    },
+    {
+      label: 'Share 3: Trusted Contact / Attorney',
+      desc: 'Entrusted to a partner, co-founder, or emergency contact.',
+    },
+    {
+      label: 'Share 4: Secondary Hardware / Air-Gapped USB',
+      desc: 'Stored on an air-gapped flash drive or secondary machine.',
+    },
+    {
+      label: 'Share 5: Encrypted Cloud / Safety Deposit',
+      desc: 'Stored in separate external storage or safety deposit box.',
+    },
   ];
 
   return rawShares.map((share, idx) => ({
@@ -167,32 +221,63 @@ export async function createShamirRecoveryShares(masterKey: Uint8Array): Promise
 }
 
 /**
- * Reconstructs the 256-bit Master Key from any 3 (or more) Shamir shares.
+ * Reconstructs the 256-bit Master Key from any 3 (or more) distinct Shamir shares.
  */
 export async function reconstructMasterKeyFromShares(shareHexList: string[]): Promise<Uint8Array> {
-  if (shareHexList.length < 3) {
-    throw new Error('At least 3 valid recovery shares are required to reconstruct the vault key.');
+  // Filter and normalize
+  const validHexList = shareHexList
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+
+  if (validHexList.length < 3) {
+    throw new Error(
+      `Threshold not reached: At least 3 separate recovery shares are required (provided: ${validHexList.length}).`
+    );
   }
 
-  const rawShares = shareHexList.map(hexToBuffer);
-  const recoveredKey = await sssCombine(rawShares);
-  return new Uint8Array(recoveredKey);
+  // Deduplicate identical shares
+  const uniqueHex = Array.from(new Set(validHexList.map((h) => h.toLowerCase())));
+  if (uniqueHex.length < 3) {
+    throw new Error('Duplicate shares detected. You must provide 3 distinct shares from different locations.');
+  }
+
+  const rawShares = uniqueHex.map(hexToBuffer);
+  try {
+    const recoveredKey = await sssCombine(rawShares);
+    return new Uint8Array(recoveredKey);
+  } catch (err) {
+    throw new Error(
+      'Cryptographic reconstruction failed. Ensure the shares are valid and belong to the same vault: ' + String(err)
+    );
+  }
 }
 
 /**
  * Creates a brand new secure OmniID vault.
+ * 
+ * CRITICAL SECURITY INVARIANT:
+ * The returned `vault` payload contains ONLY the encrypted ciphertext and wrapped master key.
+ * All 5 shares are returned separately so they can be saved in distinct locations.
  */
 export async function createNewVault(
   passphrase: string,
-  accounts: VaultAccount[]
-): Promise<{ vault: EncryptedVaultPayload; masterKey: Uint8Array }> {
-  if (passphrase.trim().length < 8) {
-    throw new Error('Passphrase must be at least 8 characters long (recommend 5+ random words).');
+  accounts: VaultAccount[],
+  identifier: string = 'user@example.com'
+): Promise<{
+  vault: EncryptedVaultPayload;
+  shares: ShamirShareMeta[];
+  primaryShare: ShamirShareMeta;
+}> {
+  const entropy = evaluatePassphraseEntropy(passphrase);
+  if (!entropy.isValid) {
+    throw new Error(entropy.feedback);
   }
+
+  const crypto = getCrypto();
 
   // 1. Generate 256-bit cryptographically secure random Master Key
   const masterKey = new Uint8Array(32);
-  window.crypto.getRandomValues(masterKey);
+  crypto.getRandomValues(masterKey);
 
   // 2. Encrypt accounts with Master Key using AES-256-GCM
   const accountsJson = new TextEncoder().encode(JSON.stringify(accounts));
@@ -200,17 +285,20 @@ export async function createNewVault(
 
   // 3. Derive Passphrase Key via Argon2id
   const salt = new Uint8Array(16);
-  window.crypto.getRandomValues(salt);
+  crypto.getRandomValues(salt);
   const passphraseKey = await deriveKeyFromPassphrase(passphrase, salt, DEFAULT_ARGON2_PARAMS);
 
-  // 4. Wrap (encrypt) Master Key with Passphrase Key
+  // 4. Wrap Master Key with Passphrase Key
   const { iv: wrapIv, ciphertext: wrappedKeyCiphertext } = await encryptAesGcm(passphraseKey, masterKey);
 
   // 5. Generate 3-of-5 Shamir Secret Shares for disaster recovery
-  const shamirShares = await createShamirRecoveryShares(masterKey);
+  const shares = await createShamirRecoveryShares(masterKey);
+  const primaryShare = shares[0]; // Share 1
 
-  const vaultPayload: EncryptedVaultPayload = {
-    version: '3.0.0',
+  // 6. Assemble EncryptedVaultPayload (WITHOUT shares 2-5!)
+  const vault: EncryptedVaultPayload = {
+    version: '3.1.0',
+    identifier: identifier.trim().toLowerCase(),
     vaultIv: bufferToBase64(vaultIv),
     vaultCiphertext: bufferToBase64(vaultCiphertext),
     wrappedMasterKey: {
@@ -219,11 +307,58 @@ export async function createNewVault(
       ciphertext: bufferToBase64(wrappedKeyCiphertext),
       kdfParams: DEFAULT_ARGON2_PARAMS,
     },
-    shamirShares,
     createdAt: new Date().toISOString(),
   };
 
-  return { vault: vaultPayload, masterKey };
+  return {
+    vault,
+    shares,
+    primaryShare,
+  };
+}
+
+/**
+ * Creates the exportable Rescue Kit JSON.
+ * Contains the encrypted vault plus ONLY Share 1.
+ */
+export function generateRescueKitFile(
+  identifier: string,
+  vault: EncryptedVaultPayload,
+  primaryShare: ShamirShareMeta
+): RescueKitExport {
+  return {
+    version: '3.1.0',
+    title: 'OmniID Emergency Rescue Kit',
+    identifier: identifier.trim().toLowerCase(),
+    createdAt: vault.createdAt,
+    securityNotice:
+      'CRITICAL: This file alone CANNOT open your vault. It contains your encrypted vault and Share 1 of 5. To unlock without your passphrase, you MUST also supply 2 additional separate Shamir shares from your other storage locations.',
+    encryptedVault: vault,
+    primaryRescueShare: primaryShare,
+  };
+}
+
+/**
+ * Generates separate formatted cards for each share so the user can distribute them.
+ */
+export function generateSeparateShareCards(
+  identifier: string,
+  shares: ShamirShareMeta[]
+): SeparateShareCard[] {
+  return shares.map((s) => ({
+    shareIndex: s.index,
+    totalShares: 5,
+    threshold: 3,
+    identifier: identifier.trim().toLowerCase(),
+    label: s.label,
+    description: s.description,
+    shareHex: s.shareHex,
+    instructions:
+      `OmniID Recovery Share (${s.index} of 5).\n` +
+      `Threshold: Any 3 shares reconstruct your master key.\n` +
+      `Store this file/printout in a separate location from your other shares and Rescue Kit.\n` +
+      `NEVER store all 5 shares together.`,
+  }));
 }
 
 /**
@@ -260,7 +395,6 @@ export async function unlockVaultWithPassphrase(
     const jsonStr = new TextDecoder().decode(accountsBytes);
     return JSON.parse(jsonStr) as VaultAccount[];
   } finally {
-    // Zeroize memory
     zeroizeBuffer(masterKey);
     zeroizeBuffer(passphraseKey);
   }

@@ -45,7 +45,7 @@ OmniID is an emergency parachute, not a login replacement. When your phone is un
    If you forgot your passphrase or cannot access your normal credentials, input any **3 out of 5** distributed Shamir shares (e.g., printed card + trusted contact share + cloud backup). The Master Key is mathematically reconstructed in-memory without a central server.
 
 3. **Ephemeral Canvas Display:**  
-   Your 6-digit TOTP codes render directly to an HTML5 `<canvas>` with randomized sub-pixel noise to foil DOM-scraping extensions. A 45-second timer auto-locks and wipes RAM (`zeroizeBuffer()`).
+   Your 6-digit TOTP codes render directly to an HTML5 `<canvas>` with randomized sub-pixel noise to foil DOM-scraping extensions. A 60-second timer auto-locks and purges session memory.
 
 ---
 
@@ -61,18 +61,20 @@ OmniID is an emergency parachute, not a login replacement. When your phone is un
 |        +---> Encrypts TOTP seeds & backup codes via AES-256-GCM                    |
 |        |                                                                           |
 |        +---> [ Key Path 1: Passphrase Wrapping ]                                   |
-|        |     High-entropy Passphrase + 16-byte Salt -> Argon2id (64MB)             |
+|        |     High-entropy Passphrase (4+ words / 14+ chars) + 16-byte Salt         |
+|        |     -> Argon2id (64MB, 3 iterations)                                      |
 |        |     Wraps Master Key via AES-256-GCM                                      |
 |        |                                                                           |
 |        +---> [ Key Path 2: 3-of-5 Shamir's Secret Sharing ]                        |
-|              Master Key is split into 5 cryptographic shares:                      |
-|              - Share 1: Primary Device                                             |
-|              - Share 2: Printed Emergency Paper / QR Card                          |
-|              - Share 3: Trusted Contact (co-founder / family)                      |
-|              - Share 4: Encrypted Offline Backup                                   |
-|              - Share 5: Time-Locked Escrow                                         |
+|              Master Key is split into 5 distinct shares:                           |
+|              - Share 1: Primary Device / Rescue Kit (Share 1 only)                 |
+|              - Share 2: Printed Emergency Paper Card                               |
+|              - Share 3: Trusted Contact (partner / co-founder / attorney)          |
+|              - Share 4: Secondary Hardware / Air-Gapped USB                        |
+|              - Share 5: Encrypted Cloud Storage / Safety Deposit Box               |
 |                                                                                    |
-|              * Any 3 shares reconstruct the 256-bit Master Key                     |
+|              * Any 3 distinct shares reconstruct the 256-bit Master Key            |
+|              * The Rescue Kit JSON contains AT MOST Share 1                        |
 |                                                                                    |
 +------------------------------------------------------------------------------------+
 ```
@@ -89,14 +91,32 @@ Earlier biometric recovery prototypes attempted to use facial landmark embedding
 
 | Threat | Impact | OmniID Mitigation |
 | :--- | :--- | :--- |
-| **Database Breach** | High | Ciphertext-only storage. Master key is protected by Argon2id (64MB memory cost) or Shamir shares; no offline 4-digit brute force is possible. |
-| **Borrowed Laptop Malware** | Medium | Codes are drawn to an isolated HTML5 `<canvas>` (not stored as DOM text nodes). 45-second ephemeral countdown triggers memory zeroization. |
-| **Identical Twin / Family Member** | Low | Without the high-entropy passphrase or 3 Shamir shares, physical appearance grants zero access. |
-| **Phone Theft / Destruction** | None | Primary design target. Recovery is completely hardware-independent via passphrase or Shamir shares. |
+| **Database / Rescue Kit Leak** | High | Ciphertext-only storage. The Rescue Kit contains only Share 1. An attacker cannot decrypt without either the passphrase or 2 additional separate offsite shares. |
+| **Borrowed Laptop Extension Scraping** | Medium | Codes are drawn to an isolated HTML5 `<canvas>` (not stored as DOM text nodes). 60-second timer auto-locks and clears session memory. |
+| **Identical Twin / Family Member** | Low | Without the high-entropy passphrase or 3 distinct Shamir shares, physical appearance grants zero access. |
+| **Phone Theft / Destruction** | None | Primary design target. Recovery is completely hardware-independent via passphrase or 3-of-5 Shamir shares. |
 
 ---
 
-## 5. Local Setup & Development
+## 5. Automated Cryptographic Test Suite
+
+Run the cryptographic test suite:
+
+```bash
+npm test
+```
+
+Asserts:
+- Passphrase entropy floor (rejects < 8 chars and weak words; accepts 4+ diceware words or 14+ chars).
+- Vault creation contains zero shares in ciphertext payload.
+- 2 shares fail to unlock vault.
+- Rescue Kit JSON alone (Share 1) cannot open vault.
+- Any 3 distinct shares successfully reconstruct master key and decrypt vault.
+- Duplicate shares are rejected.
+
+---
+
+## 6. Local Setup & Development
 
 ```bash
 # Clone the repository
