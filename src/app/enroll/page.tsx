@@ -11,6 +11,7 @@ import {
   EncryptedVaultPayload,
   ShamirShareMeta,
 } from '@/lib/crypto/vaultCrypto';
+import { saveVaultEverywhere } from '@/lib/storage/vaultSync';
 import {
   ArrowRight,
   Plus,
@@ -129,6 +130,9 @@ export default function EnrollPage() {
         localStorage.setItem(`omni_vault_${username.toLowerCase().trim()}`, JSON.stringify(localRecord));
         localStorage.setItem('omni_latest_user', username.toLowerCase().trim());
       }
+
+      // Optionally sync encrypted vault blob (ZERO shares) to Neon-backed API if configured
+      await saveVaultEverywhere(username, vault);
 
       setStep(4);
       setDistributionStep(1);

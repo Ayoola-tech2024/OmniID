@@ -61,7 +61,7 @@ export default function RecoverPage() {
     }
   }, []);
 
-  const handleLookup = () => {
+  const handleLookup = async () => {
     setErrorMessage(null);
     setInfoMessage(null);
     if (!username.trim()) {
@@ -100,6 +100,23 @@ export default function RecoverPage() {
           return;
         }
       }
+    }
+
+    // Fallback: look up encrypted vault ciphertext from Neon-backed cloud API (if configured)
+    const { vault: remoteVault, source } = await loadVaultByHandle(username);
+    if (remoteVault) {
+      setVaultPayload(remoteVault);
+      setShare1('');
+      setShare1Source(null);
+      setShare2('');
+      setShare3('');
+      setInfoMessage(
+        source === 'cloud'
+          ? 'Encrypted vault ciphertext fetched from cloud sync. Enter your passphrase or any 3 Shamir shares.'
+          : null
+      );
+      setStage('auth');
+      return;
     }
 
     setErrorMessage(
