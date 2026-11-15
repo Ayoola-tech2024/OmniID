@@ -73,3 +73,28 @@ export async function loadVaultByHandle(
 
   return { vault: null, source: 'none' };
 }
+
+export async function joinWaitlist(
+  email: string,
+  source: string = 'landing_page'
+): Promise<{ ok: boolean; alreadyJoined?: boolean; error?: string }> {
+  const apiBase = getApiBaseUrl() || 'https://omniid-vault-api.adamsromeo163.workers.dev';
+  try {
+    const res = await fetch(`${apiBase}/waitlist`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim().toLowerCase(), source }),
+    });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      alreadyJoined?: boolean;
+      error?: string;
+    };
+    if (!res.ok) {
+      return { ok: false, error: data.error || 'Could not join waitlist.' };
+    }
+    return { ok: true, alreadyJoined: Boolean(data.alreadyJoined) };
+  } catch {
+    return { ok: false, error: 'Network error. Please try again.' };
+  }
+}

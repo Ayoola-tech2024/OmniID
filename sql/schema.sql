@@ -10,3 +10,10 @@ CREATE TABLE IF NOT EXISTS vaults (
 );
 
 CREATE INDEX IF NOT EXISTS idx_vaults_updated_at ON vaults (updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS waitlist (
+  id SERIAL PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  source TEXT DEFAULT 'landing_page',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

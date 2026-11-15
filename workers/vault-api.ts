@@ -108,6 +108,31 @@ export default {
       });
     }
 
+    if (request.method === 'POST' && url.pathname === '/waitlist') {
+      const body = (await request.json()) as { email?: string; source?: string };
+      const email = (body.email || '').trim().toLowerCase();
+      const source = (body.source || 'landing_page').trim();
+
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return new Response(JSON.stringify({ error: 'Please enter a valid email address.' }), {
+          status: 400,
+          headers,
+        });
+      }
+
+      const inserted = await sql`
+        INSERT INTO waitlist (email, source)
+        VALUES (${email}, ${source})
+        ON CONFLICT (email) DO NOTHING
+        RETURNING id
+      `;
+
+      return new Response(
+        JSON.stringify({ ok: true, alreadyJoined: inserted.length === 0 }),
+        { status: 200, headers }
+      );
+    }
+
     return new Response(JSON.stringify({ error: 'Not found' }), {
       status: 404,
       headers,
