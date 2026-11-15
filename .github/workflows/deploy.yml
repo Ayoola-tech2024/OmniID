@@ -33,6 +33,7 @@ jobs:
       - name: Build Next.js Static Export
         env:
           GITHUB_PAGES: "true"
+          NEXT_PUBLIC_VAULT_API_URL: "https://omniid-vault-api.adamsromeo163.workers.dev"
         run: npm run build
 
       - name: Add .nojekyll

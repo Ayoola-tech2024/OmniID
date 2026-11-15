@@ -1,0 +1,8 @@
+name = "omniid-vault-api"
+main = "workers/vault-api.ts"
+compatibility_date = "2026-11-01"
+workers_dev = true
+account_id = "4afb09318ff4963476a7ad58869b6a2b"
+
+[vars]
+ALLOWED_ORIGIN = "https://ayoola-tech2024.github.io"
