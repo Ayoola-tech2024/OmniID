@@ -20,9 +20,9 @@ export default function HomePage() {
               </h1>
 
               <p className="text-base text-zinc-400 leading-relaxed max-w-xl">
-                Two-factor prompts assume your phone is in your pocket, charged, and connected. 
-                When power cuts hit in Lagos or your battery drops to zero, Google asks you to tap a prompt on a dead screen. 
-                OmniID stores your authenticator seeds so you can decrypt them on any borrowed laptop without trusting the machine.
+                Two-factor login assumes your phone is always in your pocket, charged, and working. 
+                When your battery dies, your phone gets stolen, or the power goes out, Google still asks you to tap a prompt on a dead screen. 
+                OmniID keeps an encrypted backup of your 6-digit login codes so you can get back into your accounts from any borrowed laptop or phone—safely.
               </p>
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -30,7 +30,7 @@ export default function HomePage() {
                   href="/recover"
                   className="flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-xs font-semibold text-zinc-900 shadow-sm transition hover:bg-zinc-200"
                 >
-                  <span>Open Emergency Vault</span>
+                  <span>Recover My Accounts</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
 
@@ -39,22 +39,22 @@ export default function HomePage() {
                   className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-5 py-2.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
                 >
                   <KeyRound className="h-3.5 w-3.5 text-zinc-400" />
-                  <span>Create Recovery Kit</span>
+                  <span>Set Up My Backup</span>
                 </Link>
               </div>
 
               <div className="flex flex-wrap items-center gap-5 pt-3 text-xs text-zinc-500">
                 <span className="flex items-center gap-1.5">
                   <Lock className="h-3.5 w-3.5 text-zinc-400" />
-                  Argon2id encryption
+                  Locked with your own secret phrase
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Users className="h-3.5 w-3.5 text-zinc-400" />
-                  Shamir 3-of-5 key split
+                  5-part backup key (need any 3)
                 </span>
                 <span className="flex items-center gap-1.5">
                   <EyeOff className="h-3.5 w-3.5 text-zinc-400" />
-                  Ephemeral memory display
+                  Auto-clears after 60 seconds
                 </span>
               </div>
             </div>
@@ -63,7 +63,7 @@ export default function HomePage() {
             <div className="lg:col-span-5">
               <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 shadow-lg">
                 <div className="flex items-center justify-between pb-2 px-1 text-xs text-zinc-400 border-b border-zinc-800/80 mb-2.5">
-                  <span className="font-medium text-zinc-300">The Lockout Scenario</span>
+                  <span className="font-medium text-zinc-300">The Lockout Problem</span>
                   <span className="text-[11px] text-zinc-500">Google Prompt Verification</span>
                 </div>
 
@@ -81,7 +81,7 @@ export default function HomePage() {
                     <p className="text-zinc-200 font-medium">When you cannot tap your phone:</p>
                     <p className="mt-1 text-[11px] leading-relaxed">
                       Click <strong className="text-zinc-300">&quot;More ways to verify&quot;</strong> on Google or GitHub, 
-                      choose Authenticator code, and use OmniID on your current screen to get the 6-digit code.
+                      choose Authenticator code, and open OmniID on whatever screen you are using to get your 6-digit code.
                     </p>
                   </div>
                 </div>
@@ -96,14 +96,14 @@ export default function HomePage() {
         <div className="container mx-auto max-w-6xl px-4 sm:px-6">
           <div className="max-w-2xl mb-12">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
-              Architecture
+              How It Keeps You Safe
             </h2>
             <h3 className="text-2xl font-bold text-white tracking-tight">
-              Designed so a server breach reveals no keys
+              Even if our database leaks, nobody can read your codes
             </h3>
             <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
-              We do not store plain secrets or unstable facial biometric keys. 
-              The vault relies on two recovery mechanisms that you control.
+              Your secrets are scrambled inside your browser before they ever leave your device. 
+              We never see your password, and no single person or file can unlock your backup.
             </p>
           </div>
 
@@ -113,14 +113,13 @@ export default function HomePage() {
                 <div className="h-8 w-8 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300 mb-3">
                   <Lock className="h-4 w-4" />
                 </div>
-                <h4 className="text-sm font-semibold text-white">1. Argon2id Passphrase KDF</h4>
+                <h4 className="text-sm font-semibold text-white">1. A Secret Phrase Only You Know</h4>
                 <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                  Your master key is wrapped with a passphrase using Argon2id with 64 MB of RAM and three iterations. 
-                  Offline guessing attacks require dedicated memory per attempt, making mass cracking impractical.
+                  You pick (or generate) a strong 6-word passphrase. Your device turns it into a heavy-duty lock that takes hackers centuries to guess—even with fast computers.
                 </p>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-800/60 text-[11px] text-zinc-500 font-mono">
-                Memory-hard key derivation
+                Argon2id + AES-256-GCM
               </div>
             </div>
 
@@ -129,14 +128,13 @@ export default function HomePage() {
                 <div className="h-8 w-8 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300 mb-3">
                   <Users className="h-4 w-4" />
                 </div>
-                <h4 className="text-sm font-semibold text-white">2. Shamir 3-of-5 Recovery</h4>
+                <h4 className="text-sm font-semibold text-white">2. Backup Key Split into 5 Pieces</h4>
                 <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                  Your vault key splits into five cryptographic shares. You store one locally, print one, give one to a trusted contact, 
-                  and keep an offline copy. Any three shares reconstruct the key if you forget your passphrase.
+                  What if you forget your passphrase? Your master key is split into 5 separate pieces (one in your Rescue Kit, one printed, one with a trusted friend, etc.). Any 3 pieces unlock your vault.
                 </p>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-800/60 text-[11px] text-zinc-500 font-mono">
-                No single point of failure
+                3-of-5 Shamir Secret Sharing
               </div>
             </div>
 
@@ -145,14 +143,13 @@ export default function HomePage() {
                 <div className="h-8 w-8 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300 mb-3">
                   <EyeOff className="h-4 w-4" />
                 </div>
-                <h4 className="text-sm font-semibold text-white">3. Isolated Canvas Display</h4>
+                <h4 className="text-sm font-semibold text-white">3. Safe to Use on a Borrowed Laptop</h4>
                 <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                  Decrypted codes render directly to an HTML5 canvas element with sub-pixel jitter instead of text nodes in the DOM. 
-                  Browser extensions cannot read them, and volatile memory clears on lock or after 60 seconds.
+                  Your 6-digit codes are drawn as a temporary image instead of selectable webpage text so browser extensions cannot scrape them—and everything wipes automatically after 60 seconds.
                 </p>
               </div>
               <div className="mt-4 pt-3 border-t border-zinc-800/60 text-[11px] text-zinc-500 font-mono">
-                Zero DOM footprint
+                Auto-wiping canvas display
               </div>
             </div>
           </div>
@@ -164,35 +161,35 @@ export default function HomePage() {
         <div className="container mx-auto max-w-6xl px-4 sm:px-6">
           <div className="max-w-2xl mb-10">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">
-              Workflow
+              3 Simple Steps
             </h2>
             <h3 className="text-2xl font-bold text-white tracking-tight">
-              How to recover on an untrusted device
+              How to get back in when your phone is gone
             </h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs text-zinc-400">
             <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/20 p-5">
               <span className="font-mono text-zinc-500 text-sm font-semibold">01</span>
-              <h4 className="text-sm font-semibold text-white mt-2 mb-1.5">Load your vault</h4>
+              <h4 className="text-sm font-semibold text-white mt-2 mb-1.5">Find your locked vault</h4>
               <p className="leading-relaxed">
-                On a borrowed laptop or incognito window, upload your Rescue Kit JSON (which holds your encrypted vault and Share 1) or paste the JSON text directly.
+                Open OmniID on any phone or borrowed laptop. Type your email/handle to pull your encrypted backup from the cloud, or upload your Rescue Kit file.
               </p>
             </div>
 
             <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/20 p-5">
               <span className="font-mono text-zinc-500 text-sm font-semibold">02</span>
-              <h4 className="text-sm font-semibold text-white mt-2 mb-1.5">Supply your secret</h4>
+              <h4 className="text-sm font-semibold text-white mt-2 mb-1.5">Unlock it</h4>
               <p className="leading-relaxed">
-                Enter your master passphrase to run Argon2id locally, or supply 2 additional separate Shamir shares from your printed card or trusted contact.
+                Type your secret 6-word passphrase—or, if you forgot it, combine any 3 of your 5 backup key pieces (for example, your Rescue Kit + printed paper + trusted contact).
               </p>
             </div>
 
             <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/20 p-5">
               <span className="font-mono text-zinc-500 text-sm font-semibold">03</span>
-              <h4 className="text-sm font-semibold text-white mt-2 mb-1.5">Copy code and exit</h4>
+              <h4 className="text-sm font-semibold text-white mt-2 mb-1.5">Type your 6-digit code</h4>
               <p className="leading-relaxed">
-                The 6-digit TOTP code appears on the canvas. Type it into Google, then close the tab or click Lock to purge session memory immediately.
+                Your live 6-digit login code appears on screen. Enter it into Google or GitHub, then click Lock (or close the tab) and nothing is left behind.
               </p>
             </div>
           </div>
