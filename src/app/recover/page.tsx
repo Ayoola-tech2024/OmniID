@@ -8,6 +8,7 @@ import {
   VaultAccount,
   EncryptedVaultPayload,
 } from '@/lib/crypto/vaultCrypto';
+import { loadVaultByHandle } from '@/lib/storage/vaultSync';
 import {
   AlertTriangle,
   Upload,
