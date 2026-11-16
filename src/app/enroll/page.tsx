@@ -412,13 +412,13 @@ export default function EnrollPage() {
         )}
 
         {/* STEP 4: Forced One-by-One Share Distribution Stepper */}
-        {step === 4 && createdVault && createdShares.length === 5 && (
+        {step === 4 && createdVault && (createdShares.length === 5 || distributionStep === 6) && (
           <div className="space-y-6">
             {/* Top Stepper Indicator */}
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <div>
                 <span className="text-xs text-zinc-500 font-mono">
-                  Distribution Step {distributionStep} of 5
+                  {distributionStep <= 5 ? `Distribution Step ${distributionStep} of 5` : 'Distribution Complete (5 of 5)'}
                 </span>
                 <h2 className="text-base font-bold text-white mt-0.5">
                   Distribute your recovery shares separately
